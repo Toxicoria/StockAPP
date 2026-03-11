@@ -30,3 +30,23 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Secretos y Entorno
+.env
+.env.*
+
+# Archivos de Tailscale (¡Vital!)
+cliente-sidecar/tsnet-state/
+
+# Infraestructura
+infra/postgres_data/
+
+# Dependencias y compilados pesados
+app-desktop/node_modules/
+app-desktop/.svelte-kit/
+app-desktop/src-tauri/target/
+
+# Binarios compilados
+backend/backend
+backend/main
+cliente-sidecar/cliente-sidecar

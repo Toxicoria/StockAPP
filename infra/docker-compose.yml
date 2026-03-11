@@ -1,0 +1,45 @@
+services:
+  # PostgreSQL
+  postgres_dev:
+    image: postgres:16-alpine
+    container_name: db_sistema_stock
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin_dev
+      POSTGRES_PASSWORD: password_dev
+      POSTGRES_DB: stock_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data_dev:/var/lib/postgresql/data
+
+  # Tailscale
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: ts_puerta_enlace
+    hostname: stock-server-api
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+  # API en Go
+  api_go:
+    build: 
+      context: ../backend 
+    container_name: api_sistema_stock
+    restart: unless-stopped
+    depends_on:
+      - postgres_dev
+      - tailscale
+    network_mode: "service:tailscale"
+
+volumes:
+  pg_data_dev:
+  tailscale_data:
