@@ -19,9 +19,51 @@ Desarrollo de control de inventario y ventas con arquitectura cliente-servidor.
 - Comunicación cifrada de extremo a extremo.
 - Base de datos multi-tenant aislada.
 
+---
+## 📦 1. Instalación de Requisitos y Paquetes
+
+Es fundamental contar con los compiladores y runtimes instalados antes de intentar descargar las dependencias del proyecto.
+
+### 🐧 En Linux (Fedora - Recomendado)
+Ejecuta los siguientes comandos para instalar el stack completo:
+
+1. **Motores de lenguaje:**
+   `sudo dnf install golang nodejs rust cargo`
+2. **Dependencias de compilación para Tauri:**
+   `sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget libappindicator-gtk3-devel librsvg2-devel`
+3. **Docker:**
+   `sudo dnf install dnf-plugins-core && sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo`
+   `sudo dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin`
+   `sudo systemctl enable --now docker`
+
+### 🪟 En Windows (PowerShell como Administrador)
+Se recomienda el uso de un gestor de paquetes como `choco` o `winget`, o instaladores oficiales:
+
+1. **Motores de lenguaje:**
+   `winget install GoLang.Go.1.25`
+   `winget install OpenJS.NodeJS.LTS`
+   `winget install Rustlang.Rustup`
+2. **Herramientas de C++ (Vital para Tauri/Rust):**
+   Descargar [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) y seleccionar la carga de trabajo "Desarrollo para el escritorio con C++".
+3. **WebView2:**
+   Instalar el [Evergreen Bootstrapper](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) de Microsoft.
+4. **Docker:**
+   Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/) y asegurarse de que el motor WSL2 esté activo.
 
 ---
 
+## 🛠 2. Descarga de Dependencias del Proyecto
+
+Una vez instalados los motores de arriba, ejecuta lo siguiente en la raíz de `StockAPP`:
+
+* **Módulos de Go (Backend y Sidecar):**
+  `cd backend && go mod tidy && cd ../cliente-sidecar && go mod tidy`
+* **Módulos de Node (Frontend):**
+  `cd app-desktop && npm install`
+* **Imágenes de Docker:**
+  `cd infra && docker compose pull`
+---
+---
 ## 🛠 1. Configuración del Entorno y Dependencias
 
 Antes de iniciar, ambos sistemas deben contar con: **Docker**, **Go (v1.25.7+)**, **Node.js (v20+)** y **Rust/Cargo**.
