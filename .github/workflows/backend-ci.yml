@@ -1,18 +1,16 @@
 name: Backend CI (Go)
 
-# 1. ¿Cuándo se ejecuta esto? (Triggers)
 on:
   push:
     branches: [ "main" ]
-    # Solo se ejecuta si hay cambios en la carpeta de Go
     paths:
       - 'backend/**'
       - 'cliente-sidecar/**'
   pull_request:
     branches: [ "main" ]
 
-# 2. ¿Qué trabajos va a realizar?
 jobs:
+# ... (el resto queda igual)
   construir-y-probar:
     # 3. ¿En qué sistema operativo correrá? (GitHub nos presta un Ubuntu)
     runs-on: ubuntu-latest
