@@ -23,7 +23,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/api/ping", pingHandler)
-
+	print("print de test")
 	fmt.Println("🚀 Servidor Go escuchando en el puerto 8080...")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
