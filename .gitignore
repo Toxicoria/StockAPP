@@ -50,3 +50,5 @@ app-desktop/src-tauri/target/
 backend/backend
 backend/main
 cliente-sidecar/cliente-sidecar
+# archivos de datos masivos
+backend/lote_csv/
