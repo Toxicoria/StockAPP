@@ -2,37 +2,37 @@ name: Backend CI (Go)
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
     paths:
       - 'backend/**'
       - 'cliente-sidecar/**'
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   construir-y-probar:
     runs-on: ubuntu-latest
-
     steps:
-    - name: 📥 Clonar el repositorio
-      uses: actions/checkout@v4
+      - name: 📥 Clonar el repositorio
+        uses: actions/checkout@v4
 
-    - name: ⚙️ Instalar Go 1.25
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.25.x'
-        cache-dependency-path: |
-          cliente-sidecar/go.sum
+      - name: ⚙️ Instalar Go 1.25
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          # Eliminamos backend/go.sum porque el archivo aún no existe en tu repo
+          cache-dependency-path: cliente-sidecar/go.sum
 
-    - name: 📦 Verificar Backend (API)
-      working-directory: ./backend
-      run: |
-        go mod tidy
-        go build -v ./...
+      - name: 📦 Verificar Backend (API)
+        working-directory: ./backend
+        run: |
+          go mod tidy
+          go build -v ./...
 
-    - name: 👻 Verificar Cliente Sidecar
-      working-directory: ./cliente-sidecar
-      run: |
-        go mod tidy
-        go build -v ./...
-#comentario
+      - name: 👻 Verificar Cliente Sidecar
+        working-directory: ./cliente-sidecar
+        run: |
+          go mod tidy
+          go build -v ./...
