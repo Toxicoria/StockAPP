@@ -26,7 +26,6 @@ jobs:
         go-version: '1.25.x'
         # Esto habilita el caché para que las dependencias bajen más rápido la próxima vez
         cache-dependency-path: |
-          backend/go.sum
           cliente-sidecar/go.sum
 
     - name: 📦 Verificar Backend (API)
