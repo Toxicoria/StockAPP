@@ -22,6 +22,7 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// testeando el codigo nuevamente
 	http.HandleFunc("/api/ping", pingHandler)
 	print("print de test")
 	fmt.Println("🚀 Servidor Go escuchando en el puerto 8080...")
@@ -29,5 +30,4 @@ func main() {
 		panic(err)
 	}
 }
-
-// test
+//reintentar pipeline
