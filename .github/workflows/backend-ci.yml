@@ -22,7 +22,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
-          # Eliminamos backend/go.sum porque el archivo aún no existe en tu repo
           cache-dependency-path: cliente-sidecar/go.sum
 
       - name: 📦 Verificar Backend (API)
@@ -35,4 +34,4 @@ jobs:
         working-directory: ./cliente-sidecar
         run: |
           go mod tidy
-          go build -v ./...
+        go build -v ./...
