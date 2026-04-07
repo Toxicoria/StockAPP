@@ -10,12 +10,9 @@ on:
     branches: [ "main" ]
 
 jobs:
-# ... (el resto queda igual)
   construir-y-probar:
-    # 3. ¿En qué sistema operativo correrá? (GitHub nos presta un Ubuntu)
     runs-on: ubuntu-latest
 
-    # 4. Los pasos secuenciales
     steps:
     - name: 📥 Clonar el repositorio
       uses: actions/checkout@v4
@@ -24,7 +21,6 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.25.x'
-        # Esto habilita el caché para que las dependencias bajen más rápido la próxima vez
         cache-dependency-path: |
           cliente-sidecar/go.sum
 
