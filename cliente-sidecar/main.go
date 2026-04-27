@@ -32,9 +32,18 @@ func main() {
 
 	// 4. Crear el servidor local para que Svelte le hable (El Proxy)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Permitir que Svelte (localhost) hable con este puerto
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Permitir que Svelte hable con este puerto, restringiendo CORS
+		origin := r.Header.Get("Origin")
+		if origin == "http://localhost:1420" || origin == "http://tauri.localhost" || origin == "https://tauri.localhost" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
 		// Solo interceptar peticiones a la API
 		if r.URL.Path == "/api/ping" {
@@ -65,6 +74,6 @@ func main() {
 		}
 	})
 
-	fmt.Println("👻 Sidecar activo. Escuchando a Svelte en http://localhost:9090")
-	log.Fatal(http.ListenAndServe(":9090", nil))
+	fmt.Println("👻 Sidecar activo. Escuchando a Svelte en http://127.0.0.1:9090")
+	log.Fatal(http.ListenAndServe("127.0.0.1:9090", nil))
 }

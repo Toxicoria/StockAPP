@@ -15,7 +15,10 @@ import (
 
 func main() {
 
-	connStr := "postgres://admin_dev:password_dev@localhost:5432/stock_db?sslmode=disable"
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		connStr = "postgres://admin_dev:password_dev@127.0.0.1:5432/stock_db?sslmode=disable"
+	}
 	rutaArchivoLimpio := "./productos_limpios.csv"
 
 	fmt.Println("Conectando PostgreSQL de docker")
