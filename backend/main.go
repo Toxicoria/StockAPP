@@ -7,8 +7,7 @@ import (
 )
 
 func pingHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Habilitar CORS: Permitimos que cualquier frontend consulte esta ruta
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// 1. Cabeceras (CORS ya manejado por el Sidecar)
 	w.Header().Set("Content-Type", "application/json")
 
 	// 2. Armar la respuesta en formato JSON
