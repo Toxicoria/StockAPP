@@ -6,10 +6,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	csvReset  = "\033[0m"
+	csvRed    = "\033[1;31m"
+	csvGreen  = "\033[1;32m"
+	csvYellow = "\033[1;33m"
+	csvCyan   = "\033[1;36m"
 )
 
 // Estructura para guardar temporalmente en memoria
@@ -42,12 +49,13 @@ func main() {
 	productosDescartadosPorEAN := 0
 	productosDuplicados := 0
 
-	fmt.Println("🚀 Iniciando pipeline de procesamiento de datos...")
+	fmt.Printf("%s[INFO]%s Iniciando pipeline de procesamiento de datos...\n", csvCyan, csvReset)
 
 	// 1. LEER CARPETA DE ENTRADA
 	archivos, err := os.ReadDir(rutaCarpetaEntrada)
 	if err != nil {
-		log.Fatalf("❌ No se pudo leer la carpeta de entrada %s: %v", rutaCarpetaEntrada, err)
+		fmt.Printf("%s[ERROR]%s No se pudo leer la carpeta de entrada %s: %v\n", csvRed, csvReset, rutaCarpetaEntrada, err)
+		os.Exit(1)
 	}
 
 	// 2. EXTRAER Y LIMPIAR DATOS
@@ -57,11 +65,11 @@ func main() {
 		}
 
 		rutaCompleta := filepath.Join(rutaCarpetaEntrada, archivoInfo.Name())
-		fmt.Printf("📄 Procesando: %s\n", archivoInfo.Name())
+		fmt.Printf("%s[INFO]%s Procesando: %s\n", csvCyan, csvReset, archivoInfo.Name())
 
 		archivo, err := os.Open(rutaCompleta)
 		if err != nil {
-			log.Printf("⚠️ Error al abrir %s: %v", archivoInfo.Name(), err)
+			fmt.Printf("%s[WARN]%s Error al abrir %s: %v\n", csvYellow, csvReset, archivoInfo.Name(), err)
 			continue
 		}
 
@@ -116,10 +124,11 @@ func main() {
 	}
 
 	// 3. EXPORTAR EL NUEVO CATÁLOGO LIMPIO
-	fmt.Println("\n💾 Generando archivo maestro unificado...")
+	fmt.Printf("\n%s[INFO]%s Generando archivo maestro unificado...\n", csvCyan, csvReset)
 	archivoSalida, err := os.Create(rutaArchivoSalida)
 	if err != nil {
-		log.Fatalf("❌ Error fatal al crear el archivo de salida: %v", err)
+		fmt.Printf("%s[ERROR]%s Error fatal al crear el archivo de salida: %v\n", csvRed, csvReset, err)
+		os.Exit(1)
 	}
 	defer archivoSalida.Close()
 
@@ -137,7 +146,8 @@ func main() {
 	}
 
 	if err := escritor.Write(encabezados); err != nil {
-		log.Fatalf("Error al escribir encabezados: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al escribir encabezados: %v\n", csvRed, csvReset, err)
+		os.Exit(1)
 	}
 
 	// Volcar el catálogo desde la memoria RAM al disco duro
@@ -151,23 +161,24 @@ func main() {
 			prod.Marca,
 		}
 		if err := escritor.Write(fila); err != nil {
-			log.Printf("⚠️ Error al escribir el producto %s: %v", codigo, err)
+			fmt.Printf("%s[WARN]%s Error al escribir el producto %s: %v\n", csvYellow, csvReset, codigo, err)
 		}
 	}
 
 	// Asegurarnos de que todo se guarde
 	escritor.Flush()
 	if err := escritor.Error(); err != nil {
-		log.Fatalf("❌ Error al finalizar la escritura: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al finalizar la escritura: %v\n", csvRed, csvReset, err)
+		os.Exit(1)
 	}
 
 	// 4. REPORTE FINAL
 	fmt.Println("\n=================================================")
-	fmt.Println("✅ OPERACIÓN COMPLETADA CON ÉXITO")
+	fmt.Printf("%s[OK]%s OPERACION COMPLETADA CON EXITO\n", csvGreen, csvReset)
 	fmt.Println("=================================================")
-	fmt.Printf("📦 Total de productos unificados: %d\n", len(catalogoUnico))
-	fmt.Printf("🗑️  Falsos EAN descartados:       %d\n", productosDescartadosPorEAN)
-	fmt.Printf("🔁 Duplicados eliminados:         %d\n", productosDuplicados)
-	fmt.Printf("📁 Archivo generado en:           %s\n", rutaArchivoSalida)
+	fmt.Printf("Total de productos unificados: %d\n", len(catalogoUnico))
+	fmt.Printf("Falsos EAN descartados:        %d\n", productosDescartadosPorEAN)
+	fmt.Printf("Duplicados eliminados:         %d\n", productosDuplicados)
+	fmt.Printf("Archivo generado en:           %s\n", rutaArchivoSalida)
 	fmt.Println("=================================================")
 }

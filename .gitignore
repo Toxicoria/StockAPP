@@ -52,3 +52,7 @@ backend/main
 cliente-sidecar/cliente-sidecar
 # archivos de datos masivos
 backend/lote_csv/
+
+# Process Compose (contiene secrets, no subir)
+process-compose.yaml
+bin/

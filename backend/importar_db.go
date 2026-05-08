@@ -7,10 +7,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	_ "github.com/lib/pq"
+)
+
+const (
+	dbReset  = "\033[0m"
+	dbRed    = "\033[1;31m"
+	dbGreen  = "\033[1;32m"
+	dbYellow = "\033[1;33m"
+	dbCyan   = "\033[1;36m"
 )
 
 func main() {
@@ -18,17 +25,19 @@ func main() {
 	connStr := "postgres://admin_dev:password_dev@localhost:5432/stock_db?sslmode=disable"
 	rutaArchivoLimpio := "./productos_limpios.csv"
 
-	fmt.Println("Conectando PostgreSQL de docker")
+	fmt.Printf("%s[INFO]%s Conectando a PostgreSQL...\n", dbCyan, dbReset)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("Error al abrir la conexion: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al abrir la conexion: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("No se pudo hacer ping a la DB, revisar que el conteiner este encendido: %v", err)
+		fmt.Printf("%s[ERROR]%s No se pudo hacer ping a la DB, revisar que el container este encendido: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
-	fmt.Println("Conexion establecida correctamente.")
+	fmt.Printf("%s[OK]%s Conexion establecida correctamente.\n", dbGreen, dbReset)
 
 	queryCrearTabla := `
 	CREATE TABLE IF NOT EXISTS productos (
@@ -41,14 +50,16 @@ func main() {
 	);`
 
 	if _, err = db.Exec(queryCrearTabla); err != nil {
-		log.Fatalf("Error al crear la tabla: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al crear la tabla: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
-	fmt.Println("Tabla 'productos' lista.")
+	fmt.Printf("%s[OK]%s Tabla 'productos' lista.\n", dbGreen, dbReset)
 
 	// 2. ABRIR EL ARCHIVO CSV LIMPIO
 	archivo, err := os.Open(rutaArchivoLimpio)
 	if err != nil {
-		log.Fatalf("Error al abrir %s. ¿Ya ejecutaste test_csv.go?: %v", rutaArchivoLimpio, err)
+		fmt.Printf("%s[ERROR]%s Error al abrir %s. Ya ejecutaste test_csv.go?: %v\n", dbRed, dbReset, rutaArchivoLimpio, err)
+		os.Exit(1)
 	}
 	defer archivo.Close()
 
@@ -57,14 +68,16 @@ func main() {
 
 	// Descartar encabezados
 	if _, err = lector.Read(); err != nil {
-		log.Fatalf("Error leyendo encabezados: %v", err)
+		fmt.Printf("%s[ERROR]%s Error leyendo encabezados: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
 
 	// 3. INICIAR LA TRANSACCIÓN MASIVA
-	fmt.Println("🚀 Iniciando inyección masiva de datos...")
+	fmt.Printf("%s[INFO]%s Iniciando inyeccion masiva de datos...\n", dbCyan, dbReset)
 	tx, err := db.Begin()
 	if err != nil {
-		log.Fatalf("Error al iniciar transacción: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al iniciar transaccion: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
 
 	// Preparamos la consulta con ON CONFLICT para no duplicar si corres el script 2 veces
@@ -77,7 +90,8 @@ func main() {
 	`
 	stmt, err := tx.Prepare(queryInsert)
 	if err != nil {
-		log.Fatalf("Error al preparar la consulta: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al preparar la consulta: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
 	defer stmt.Close()
 
@@ -90,13 +104,13 @@ func main() {
 			break
 		}
 		if err != nil {
-			log.Printf("Error leyendo línea: %v", err)
+			fmt.Printf("%s[WARN]%s Error leyendo linea: %v\n", dbYellow, dbReset, err)
 			continue
 		}
 
 		_, err = stmt.Exec(linea[0], linea[1], linea[2], linea[3], linea[4], linea[5])
 		if err != nil {
-			log.Printf("Error al insertar producto %s: %v", linea[0], err)
+			fmt.Printf("%s[WARN]%s Error al insertar producto %s: %v\n", dbYellow, dbReset, linea[0], err)
 			continue
 		}
 		contadorInsertados++
@@ -104,11 +118,12 @@ func main() {
 
 	// 5. CONFIRMAR (COMMIT) EN EL DISCO
 	if err = tx.Commit(); err != nil {
-		log.Fatalf("Error al hacer commit: %v", err)
+		fmt.Printf("%s[ERROR]%s Error al hacer commit: %v\n", dbRed, dbReset, err)
+		os.Exit(1)
 	}
 
 	fmt.Println("\n=================================================")
-	fmt.Println("MIGRACIÓN COMPLETADA CON ÉXITO")
+	fmt.Printf("%s[OK]%s MIGRACION COMPLETADA CON EXITO\n", dbGreen, dbReset)
 	fmt.Println("=================================================")
 	fmt.Printf("Total procesado/verificado: %d productos\n", contadorInsertados)
 	fmt.Println("=================================================")
