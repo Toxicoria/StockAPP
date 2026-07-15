@@ -1,0 +1,103 @@
+# Manejo de infraestructura y desarrollo de StockAPP
+# Uso: task <nombre>  ·  Listar todo: task --list
+version: "3"
+
+env:
+  # go.mod pide 1.25.7: permite que Go baje el toolchain si el local es más viejo
+  GOTOOLCHAIN: auto
+
+tasks:
+  # ---------- Infraestructura (Docker Compose) ----------
+  infra:up:
+    desc: Levanta Postgres + Tailscale + API en Docker
+    dir: infra
+    cmds:
+      - docker compose up -d
+
+  infra:down:
+    desc: Detiene los contenedores (los datos persisten en el volumen)
+    dir: infra
+    cmds:
+      - docker compose stop
+
+  infra:logs:
+    desc: Sigue los logs de todos los contenedores
+    dir: infra
+    cmds:
+      - docker compose logs -f
+
+  infra:destroy:
+    desc: Borra contenedores Y datos (pide confirmación)
+    dir: infra
+    prompt: Esto borra el volumen de la base de datos. ¿Segura?
+    cmds:
+      - docker compose down -v
+
+  # ---------- Base de datos ----------
+  db:esquema:
+    desc: Aplica esquema.sql sobre la base ya corriendo
+    cmds:
+      - docker exec -i db_sistema_stock psql -U admin_dev -d stock_db -v ON_ERROR_STOP=1 < backend/esquema.sql
+
+  db:seed:
+    desc: Carga el negocio y admin de prueba (admin@dev.local / admin123)
+    cmds:
+      - docker exec -i db_sistema_stock psql -U admin_dev -d stock_db -v ON_ERROR_STOP=1 < backend/seed_dev.sql
+
+  db:importar:
+    desc: Importa productos_limpios.csv al catálogo maestro
+    dir: backend
+    cmds:
+      - go run importar_db.go
+
+  db:psql:
+    desc: Abre una consola psql contra la base
+    interactive: true
+    cmds:
+      - docker exec -it db_sistema_stock psql -U admin_dev -d stock_db
+
+  # ---------- Desarrollo local ----------
+  backend:run:
+    desc: Corre la API local (sin Docker, contra localhost:5432)
+    dir: backend
+    cmds:
+      - go run .
+
+  sidecar:run:
+    desc: Corre el proxy sidecar (necesita TS_AUTHKEY en el entorno)
+    dir: cliente-sidecar
+    preconditions:
+      - sh: test -n "$TS_AUTHKEY"
+        msg: "Falta TS_AUTHKEY — generarla en el panel de Tailscale"
+    cmds:
+      - go run main.go
+
+  app:dev:
+    desc: Corre la app de escritorio (Tauri + Svelte)
+    dir: app-desktop
+    cmds:
+      - npm run tauri dev
+
+  # ---------- Verificación (lo mismo que corre el CI) ----------
+  ci:
+    desc: Compila y hace vet de backend y sidecar
+    cmds:
+      - cd backend && go build -v ./... && go vet ./...
+      - cd cliente-sidecar && go build -v ./... && go vet ./...
+
+  # ---------- Kubernetes local (kind) ----------
+  k8s:up:
+    desc: Crea el cluster local de Kubernetes con kind
+    cmds:
+      - kind create cluster --name stockapp
+
+  k8s:down:
+    desc: Borra el cluster local
+    cmds:
+      - kind delete cluster --name stockapp
+
+  k9s:
+    desc: Abre k9s apuntando al cluster local
+    interactive: true
+    cmds:
+      - k9s --context kind-stockapp
