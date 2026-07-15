@@ -22,16 +22,18 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
-          cache-dependency-path: cliente-sidecar/go.sum
+          cache-dependency-path: |
+            backend/go.sum
+            cliente-sidecar/go.sum
 
       - name: 📦 Verificar Backend (API)
         working-directory: ./backend
         run: |
-          go mod tidy
           go build -v ./...
+          go vet ./...
 
       - name: 👻 Verificar Cliente Sidecar
         working-directory: ./cliente-sidecar
         run: |
-          go mod tidy
           go build -v ./...
+          go vet ./...

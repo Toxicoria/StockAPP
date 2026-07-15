@@ -28,16 +28,16 @@ func IniciarDB() {
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
-		LogError("%s[ERROR]%s Error al configurar la conexión a la DB: %v", colorRed, colorReset, err)
+		LogError("Error al configurar la conexión a la DB: %v", err)
 		os.Exit(1)
 	}
 
 	if err = DB.Ping(); err != nil {
-		LogError("%s[ERROR]%s No se pudo conectar a PostgreSQL: %v", colorRed, colorReset, err)
+		LogError("No se pudo conectar a PostgreSQL: %v", err)
 		os.Exit(1)
 	}
 
-	LogOK("%s[OK]%s Conexión a PostgreSQL establecida.\n", colorGreen, colorReset)
+	LogOK("Conexión a PostgreSQL establecida.")
 }
 
 // getEnv lee una variable de entorno y devuelve un valor por defecto si no existe.

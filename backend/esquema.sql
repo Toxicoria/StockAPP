@@ -1,4 +1,17 @@
 -- ==============================================================================
+-- 🗃️ 0. PRODUCTOS (Catálogo maestro compartido — lo carga importar_db.go)
+--    Se define acá porque stock_interno y detalles_venta le apuntan con FK.
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS productos (
+    id_producto VARCHAR(100) PRIMARY KEY,
+    productos_ean VARCHAR(10),
+    productos_descripcion VARCHAR(255),
+    productos_cantidad_presentacion VARCHAR(50),
+    productos_unidad_medida_presentacion VARCHAR(50),
+    productos_marca VARCHAR(100)
+);
+
+-- ==============================================================================
 -- 🏢 1. NEGOCIOS (Las sucursales o clientes que usarán el sistema)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS negocios (
