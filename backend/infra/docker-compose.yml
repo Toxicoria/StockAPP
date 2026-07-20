@@ -1,0 +1,83 @@
+services:
+  # PostgreSQL
+  postgres_dev:
+    image: postgres:16-alpine
+    container_name: db_sistema_stock
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin_dev
+      POSTGRES_PASSWORD: password_dev
+      POSTGRES_DB: stock_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data_dev:/var/lib/postgresql/data
+      # El esquema se aplica solo la primera vez (con el volumen vacío).
+      # Si la base ya existe, correrlo a mano: docker exec -i db_sistema_stock psql -U admin_dev -d stock_db < ../services/stock-operations/model/esquema.sql
+      - ../services/stock-operations/model/esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro
+
+  # Tailscale
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: ts_puerta_enlace
+    hostname: stock-server-api
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+  # Servicio interno en Go (lógica de negocio). No se expone al tailnet:
+  # solo el gateway le habla, por localhost dentro de la red compartida.
+  api_go:
+    build:
+      context: ../services/stock-operations
+    container_name: api_sistema_stock
+    restart: unless-stopped
+    depends_on:
+      - postgres_dev
+      - tailscale
+    network_mode: "service:tailscale"
+    environment:
+      # Comparte la red del contenedor tailscale, así que "localhost" no llega
+      # a Postgres: hay que apuntar al nombre del servicio en la red de compose.
+      DB_HOST: postgres_dev
+      DB_PORT: "5432"
+      DB_USER: admin_dev
+      DB_PASSWORD: password_dev
+      DB_NAME: stock_db
+      # La sesión se valida por introspección contra stock-api (misma red).
+      STOCK_API_URL: http://localhost:3000
+      # Cifra la clave fiscal de ARCA guardada en negocios.clave_fiscal_cifrada.
+      CONFIG_SECRET_KEY: ${CONFIG_SECRET_KEY:-clave_local_dev_no_usar_en_produccion}
+
+  # stock-api (TS/Express): usuarios + puerta de entrada de todos los endpoints.
+  # El sidecar del cliente apunta acá (stock-server-api:3000).
+  api_ts:
+    build:
+      context: ../services/stock-api
+    container_name: gateway_sistema_stock
+    restart: unless-stopped
+    depends_on:
+      - postgres_dev
+      - tailscale
+    network_mode: "service:tailscale"
+    environment:
+      DB_HOST: postgres_dev
+      DB_PORT: "5432"
+      DB_USER: admin_dev
+      DB_PASSWORD: password_dev
+      DB_NAME: stock_db
+      JWT_SECRET: ${JWT_SECRET:-secreto_solo_para_desarrollo}
+      # api_go comparte esta misma red, así que se le habla por localhost.
+      GO_INTERNO: http://localhost:8080
+      PUERTO: "3000"
+
+volumes:
+  pg_data_dev:
+  tailscale_data:

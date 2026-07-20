@@ -1,0 +1,7 @@
+<script>
+  // @ts-nocheck
+  import { onMount } from 'svelte'; import BotonVolver from '$lib/componentes/BotonVolver.svelte'; import { pedirApi } from '$lib/api.js';
+  let proveedores=$state([]);let porcentajes=$state({});let mensaje=$state('');let error=$state('');onMount(async()=>{try{proveedores=await pedirApi('/api/proveedores')}catch(e){error=e.message}});
+  async function aplicar(p){try{const r=await pedirApi(`/api/proveedores/${p.id_proveedor}/aumento`,{method:'POST',body:{porcentaje:Number(porcentajes[p.id_proveedor])}});mensaje=`${r.productos_actualizados} productos actualizados`;p.ultima_actualizacion_precios=new Date().toISOString()}catch(e){error=e.message}}
+</script>
+<BotonVolver /><h2>Precios</h2><p class="text-muted">Aplicá aumentos o bajas por proveedor. El precio se redondea a la decena.</p>{#if mensaje}<p class="ok">{mensaje}</p>{/if}{#if error}<p class="error">{error}</p>{/if}<div class="grilla">{#each proveedores as p}<section class="card"><h4>{p.nombre}</h4><span class="text-muted">{p.cantidad_productos} productos</span><label class="field"><span>Porcentaje</span><input class="input" type="number" bind:value={porcentajes[p.id_proveedor]} placeholder="10" /></label><button class="btn btn-primary" onclick={()=>aplicar(p)}>Aplicar aumento</button></section>{/each}</div><style>.grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:20px}.error{color:var(--color-peligro)}.ok{color:var(--color-accent-700)}</style>

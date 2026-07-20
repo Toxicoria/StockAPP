@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-datos
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels: { app: postgres }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: admin_dev
+            - name: POSTGRES_PASSWORD
+              value: password_dev
+            - name: POSTGRES_DB
+              value: stock_db
+          volumeMounts:
+            - name: datos
+              mountPath: /var/lib/postgresql/data
+            - name: esquema
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin_dev", "-d", "stock_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: datos
+          persistentVolumeClaim:
+            claimName: postgres-datos
+        - name: esquema
+          configMap:
+            name: esquema-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432

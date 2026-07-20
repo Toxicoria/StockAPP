@@ -47,8 +47,14 @@ func main() {
 			return
 		}
 
-		// Redirigir la petición al contenedor del servidor usando su nombre en Tailscale
-		targetURL := "http://stock-server-api:8080" + r.URL.Path
+		// Redirigir la petición al gateway del servidor usando su nombre en
+		// Tailscale. El gateway (TS/Express, :3000) es la única puerta de
+		// entrada; el servicio Go queda interno detrás de él.
+		destino := os.Getenv("DESTINO_API")
+		if destino == "" {
+			destino = "http://stock-server-api:3000"
+		}
+		targetURL := destino + r.URL.Path
 		if r.URL.RawQuery != "" {
 			targetURL += "?" + r.URL.RawQuery
 		}

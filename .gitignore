@@ -45,14 +45,20 @@ infra/postgres_data/
 app-desktop/node_modules/
 app-desktop/.svelte-kit/
 app-desktop/src-tauri/target/
+app-desktop/build/
+backend/services/stock-api/node_modules/
+backend/services/stock-api/dist/
+
+# La URL de la API en dev no es secreto: se versiona a propósito
+!app-desktop/.env.development
 
 # Binarios compilados
-backend/backend
-backend/main
-backend/stockapp-backend
+backend/services/stock-operations/backend
+backend/services/stock-operations/main
+backend/services/stock-operations/stock-operations
 cliente-sidecar/cliente-sidecar
 # archivos de datos masivos
-backend/lote_csv/
+backend/services/stock-operations/lote_csv/
 
 # Process Compose (contiene secrets, no subir)
 process-compose.yaml

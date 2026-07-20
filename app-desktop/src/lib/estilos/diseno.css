@@ -1,0 +1,311 @@
+/* ==========================================================================
+   Design system "patagónico" — tokens y clases tomados del mock aprobado
+   (App de Stock Escritorio.dc.html): azul petróleo de lago sobre gris
+   glaciar, tipografía sans (Verdana).
+   ========================================================================== */
+
+:root {
+  --color-bg: #f2f4f4;
+  --color-surface: #e6ebeb;
+  --color-text: #1f2628;
+  --color-accent: #2e6e73;
+  --color-divider: color-mix(in srgb, #1f2628 16%, transparent);
+
+  --color-accent-100: #e4f2f3;
+  --color-accent-200: #c6e4e6;
+  --color-accent-300: #9ccdd1;
+  --color-accent-400: #6cabb1;
+  --color-accent-500: #45878d;
+  --color-accent-600: #2e6e73;
+  --color-accent-700: #1f5459;
+  --color-accent-800: #153c40;
+  --color-accent-900: #0f292c;
+
+  --color-peligro: #a8443c;
+
+  --font-heading: Verdana, 'DejaVu Sans', Geneva, Tahoma, sans-serif;
+  --font-body: Verdana, 'DejaVu Sans', Geneva, Tahoma, sans-serif;
+  --font-heading-weight: 600;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #12282b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #12282b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #12282b 22%, transparent);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-bg);
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-2);
+}
+
+h1 { font-size: 34px; }
+h2 { font-size: 26px; }
+h4 { font-size: 18px; }
+h6 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+a { color: var(--color-accent); }
+a:hover { color: var(--color-accent-600); }
+
+input[type='number']::-webkit-inner-spin-button { opacity: 1; }
+
+.text-muted { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
+.hr { border: 0; border-top: 1px solid var(--color-divider); margin: var(--space-2) 0; }
+
+.elev-sm { box-shadow: var(--shadow-sm); }
+
+/* --- Cards ----------------------------------------------------------- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3) var(--space-4);
+  background: #fbfcfc;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+}
+
+.card-kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.card-meta {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+/* --- Botones ---------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.btn:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--color-accent-700); border-color: var(--color-accent-700); }
+
+.btn-secondary {
+  border-color: var(--color-divider);
+  background: transparent;
+}
+.btn-secondary:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.btn-ghost {
+  color: var(--color-accent-700);
+  padding-inline: 10px;
+}
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+
+.btn-icon { padding: 0; width: 34px; height: 34px; }
+
+.btn-block { width: 100%; }
+
+/* --- Inputs y formularios --------------------------------------------- */
+
+.input {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.input:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  outline-offset: 0;
+  border-color: var(--color-accent);
+}
+
+.input::placeholder { color: color-mix(in srgb, var(--color-text) 42%, transparent); }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field > label {
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+}
+
+/* --- Tablas ------------------------------------------------------------ */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover { background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+
+/* --- Tags -------------------------------------------------------------- */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.tag-accent {
+  background: var(--color-accent-100);
+  color: var(--color-accent-700);
+}
+
+.tag-neutral {
+  background: color-mix(in srgb, var(--color-text) 9%, transparent);
+  color: var(--color-text);
+}
+
+/* --- Control segmentado ------------------------------------------------ */
+
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+}
+
+.seg-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.seg-opt input[type='radio'] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.seg-opt:hover { background: color-mix(in srgb, var(--color-accent) 8%, transparent); }
+
+.seg-opt:has(input:checked) {
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  color: var(--color-accent-700);
+  font-weight: 600;
+}
+
+/* --- Diálogos ----------------------------------------------------------- */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: color-mix(in srgb, #12282b 42%, transparent);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(420px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: var(--space-5);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 19px;
+}
+
+.dialog-body { font-size: 14px; margin: 0; }
+
+.dialog-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-top: var(--space-1);
+}
