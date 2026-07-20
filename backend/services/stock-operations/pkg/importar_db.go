@@ -22,7 +22,15 @@ const (
 
 func main() {
 
-	connStr := "postgres://admin_dev:password_dev@localhost:5432/stock_db?sslmode=disable"
+	// Mismas variables de entorno que db.go, con los mismos defaults de desarrollo
+	connStr := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		valorEnv("DB_USER", "admin_dev"),
+		valorEnv("DB_PASSWORD", "password_dev"),
+		valorEnv("DB_HOST", "localhost"),
+		valorEnv("DB_PORT", "5432"),
+		valorEnv("DB_NAME", "stock_db"),
+	)
 	rutaArchivoLimpio := "./productos_limpios.csv"
 
 	fmt.Printf("%s[INFO]%s Conectando a PostgreSQL...\n", dbCyan, dbReset)
@@ -127,4 +135,13 @@ func main() {
 	fmt.Println("=================================================")
 	fmt.Printf("Total procesado/verificado: %d productos\n", contadorInsertados)
 	fmt.Println("=================================================")
+}
+
+// valorEnv lee una variable de entorno con valor por defecto (este archivo
+// se compila solo con "go run importar_db.go", no puede usar el getEnv de db.go).
+func valorEnv(clave, porDefecto string) string {
+	if valor, existe := os.LookupEnv(clave); existe {
+		return valor
+	}
+	return porDefecto
 }

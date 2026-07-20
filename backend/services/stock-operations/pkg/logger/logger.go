@@ -1,4 +1,4 @@
-package main
+package logger
 
 import "fmt"
 
@@ -14,27 +14,27 @@ const (
 	colorBold   = "\033[1m"  // Texto en negrita
 )
 
-// LogError imprime un mensaje de error en rojo: [ERROR] mensaje
-func LogError(msg string, args ...any) {
+// Error imprime un mensaje de error en rojo: [ERROR] mensaje
+func Error(msg string, args ...any) {
 	// Sprintf formatea el mensaje. Si hay args extra los concatena.
 	texto := fmt.Sprintf(msg, args...)
 	fmt.Printf("%s[ERROR]%s %s\n", colorRed+colorBold, colorReset, texto)
 }
 
-// LogOK imprime un mensaje de éxito en verde: [OK] mensaje
-func LogOK(msg string, args ...any) {
+// OK imprime un mensaje de éxito en verde: [OK] mensaje
+func OK(msg string, args ...any) {
 	texto := fmt.Sprintf(msg, args...)
 	fmt.Printf("%s[OK]%s %s\n", colorGreen+colorBold, colorReset, texto)
 }
 
-// LogInfo imprime un mensaje informativo en cyan: [INFO] mensaje
-func LogInfo(msg string, args ...any) {
+// Info imprime un mensaje informativo en cyan: [INFO] mensaje
+func Info(msg string, args ...any) {
 	texto := fmt.Sprintf(msg, args...)
 	fmt.Printf("%s[INFO]%s %s\n", colorCyan+colorBold, colorReset, texto)
 }
 
-// LogWarn imprime una advertencia en amarillo: [WARN] mensaje
-func LogWarn(msg string, args ...any) {
+// Warn imprime una advertencia en amarillo: [WARN] mensaje
+func Warn(msg string, args ...any) {
 	texto := fmt.Sprintf(msg, args...)
 	fmt.Printf("%s[WARN]%s %s\n", colorYellow+colorBold, colorReset, texto)
 }

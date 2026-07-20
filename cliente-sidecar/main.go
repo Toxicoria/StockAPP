@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"tailscale.com/tsnet"
 )
@@ -31,40 +32,69 @@ func main() {
 	tsClient := s.HTTPClient()
 
 	// 4. Crear el servidor local para que Svelte le hable (El Proxy)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	//    Reenvía cualquier ruta bajo /api/ — no hace falta tocar este archivo
+	//    cada vez que el backend suma un endpoint nuevo.
+	http.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		// Permitir que Svelte (localhost) hable con este puerto
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 
-		// Solo interceptar peticiones a la API
-		if r.URL.Path == "/api/ping" {
-			// Redirigir la petición al contenedor del servidor usando su nombre en Tailscale
-			targetURL := "http://stock-server-api:8080" + r.URL.Path
-
-			// Preparar el paquete
-			req, err := http.NewRequest(r.Method, targetURL, r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Disparar por el túnel
-			resp, err := tsClient.Do(req)
-			if err != nil {
-				http.Error(w, "El búnker no responde: "+err.Error(), http.StatusBadGateway)
-				return
-			}
-			defer resp.Body.Close()
-
-			// Devolver la respuesta exacta al Svelte
-			w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
-		} else {
-			http.NotFound(w, r)
+		// El navegador manda OPTIONS (preflight) antes de un POST/PUT con JSON
+		// o con Authorization: se responde acá mismo, sin viajar por el túnel.
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
 		}
+
+		// Redirigir la petición al gateway del servidor usando su nombre en
+		// Tailscale. El gateway (TS/Express, :3000) es la única puerta de
+		// entrada; el servicio Go queda interno detrás de él.
+		destino := os.Getenv("DESTINO_API")
+		if destino == "" {
+			destino = "http://stock-server-api:3000"
+		}
+		targetURL := destino + r.URL.Path
+		if r.URL.RawQuery != "" {
+			targetURL += "?" + r.URL.RawQuery
+		}
+
+		// Preparar el paquete
+		req, err := http.NewRequestWithContext(r.Context(), r.Method, targetURL, r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Reenviar los headers del cliente (Content-Type, Authorization, etc.)
+		req.Header = r.Header.Clone()
+
+		// Disparar por el túnel
+		resp, err := tsClient.Do(req)
+		if err != nil {
+			http.Error(w, "El búnker no responde: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Devolver la respuesta exacta al Svelte
+		copiarHeaders(w.Header(), resp.Header)
+		w.WriteHeader(resp.StatusCode)
+		io.Copy(w, resp.Body)
 	})
 
 	fmt.Println("👻 Sidecar activo. Escuchando a Svelte en http://localhost:9090")
 	log.Fatal(http.ListenAndServe(":9090", nil))
+}
+
+// copiarHeaders vuelca los headers de la respuesta del backend, sin pisar
+// los CORS que el proxy ya seteó.
+func copiarHeaders(destino, origen http.Header) {
+	for clave, valores := range origen {
+		if strings.HasPrefix(clave, "Access-Control-") {
+			continue
+		}
+		for _, v := range valores {
+			destino.Add(clave, v)
+		}
+	}
 }

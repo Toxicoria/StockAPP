@@ -1,4 +1,17 @@
 -- ==============================================================================
+-- 🗃️ 0. PRODUCTOS (Catálogo maestro compartido — lo carga importar_db.go)
+--    Se define acá porque stock_interno y detalles_venta le apuntan con FK.
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS productos (
+    id_producto VARCHAR(100) PRIMARY KEY,
+    productos_ean VARCHAR(10),
+    productos_descripcion VARCHAR(255),
+    productos_cantidad_presentacion VARCHAR(50),
+    productos_unidad_medida_presentacion VARCHAR(50),
+    productos_marca VARCHAR(100)
+);
+
+-- ==============================================================================
 -- 🏢 1. NEGOCIOS (Las sucursales o clientes que usarán el sistema)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS negocios (
@@ -79,3 +92,42 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
 );
+
+-- ==============================================================================
+-- 🚚 7. PROVEEDORES (Cada negocio maneja su propia lista de proveedores)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS proveedores (
+    id_proveedor SERIAL PRIMARY KEY,
+    id_negocio   INT NOT NULL,
+    nombre       VARCHAR(150) NOT NULL,
+    ultima_actualizacion_precios TIMESTAMP,      -- última vez que se aplicó un aumento
+    fecha_alta   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_negocio) REFERENCES negocios(id_negocio) ON DELETE CASCADE,
+    UNIQUE (id_negocio, nombre)
+);
+
+-- ==============================================================================
+-- 🔧 8. MIGRACIONES (Idempotentes: corren también sobre bases existentes.
+--    El init de compose solo ejecuta este archivo con el volumen vacío;
+--    `task db:esquema` lo re-aplica sobre bases vivas sin destruir datos.)
+-- ==============================================================================
+ALTER TABLE stock_interno ADD COLUMN IF NOT EXISTS stock_minimo NUMERIC(10, 2) DEFAULT 0;
+ALTER TABLE stock_interno ADD COLUMN IF NOT EXISTS id_proveedor INT REFERENCES proveedores(id_proveedor) ON DELETE SET NULL;
+
+-- Facturación: numeración local hoy, esquema listo para ARCA (WSFEv1) mañana.
+-- factura = string de display "C 0001-00000214"; cae/cae_vencimiento quedan
+-- NULL hasta integrar el web service de ARCA.
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS factura VARCHAR(30);
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS tipo_comprobante SMALLINT DEFAULT 11;  -- 11 = Factura C (monotributo)
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS nro_comprobante INT;
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS cae VARCHAR(14);
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS cae_vencimiento DATE;
+
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS punto_venta VARCHAR(4) DEFAULT '0001';
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS proximo_numero_factura INT NOT NULL DEFAULT 1;
+
+-- Clave fiscal de ARCA (u otro secreto del negocio): se guarda cifrada
+-- (AES-256-GCM, ver pkg/api/secreto.go) y nunca se devuelve por la API.
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS clave_fiscal_cifrada BYTEA;
+
+CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha_hora);

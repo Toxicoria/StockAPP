@@ -3,17 +3,39 @@
 Desarrollo de control de inventario y ventas con arquitectura cliente-servidor de alta seguridad.
 
 ## 🛠️ Stack Técnico
-- **Backend:** Go (API centralizada en Docker).
-- **DB:** PostgreSQL (Nube personal) + SQLite (Local App).
-- **Desktop:** Tauri + SvelteKit + TypeScript (Optimizado para bajos recursos).
+- **Gateway:** TypeScript + Node.js/Express (usuarios, sesiones y puerta de entrada de la API).
+- **Servicios:** Go (lógica de negocio interna: productos, stock, ventas, facturación).
+- **DB:** PostgreSQL (Nube personal).
+- **Desktop:** Tauri + SvelteKit (Svelte 5, ventana sin marco con el diseño "patagónico").
 - **Red:** Tailscale (Túnel P2P encriptado vía `tsnet`).
 - **IA:** Gemini API (Normalización de catálogo).
 
 ## 🗂️ Módulos Principales
 - `/app-desktop`: Cliente Windows/Linux (Tauri + Svelte).
-- `/backend`: Lógica de negocio y API (Go).
-- `/cliente-sidecar`: Proxy de red privada (Go + tsnet).
+- `/backend/services/stock-api`: Gateway TS/Express — login/refresh/logout y proxy de todos los endpoints (:3000).
+- `/backend/services/stock-operations`: Servicios de negocio en Go, internos detrás del gateway (:8080). Paquetes: `db/`, `pkg/api/`, `pkg/logger/`, `model/` (esquema y seed SQL).
+- `/cliente-sidecar`: Proxy de red privada (Go + tsnet, :9090 → gateway :3000).
 - `/infra`: Docker Compose y esquemas de DB.
+
+### Cómo fluye una petición
+```
+App (Tauri) → sidecar :9090 → [tailnet] → stock-api :3000 → stock-operations :8080 → PostgreSQL
+                                              ↑ ______________ /internal/session ↲
+```
+`stock-api` resuelve login/refresh/logout contra las tablas `usuarios`/`refresh_tokens`
+y emite los JWT; para el resto valida el token y reenvía a `stock-operations`.
+`stock-operations` no conoce el secreto JWT: valida cada sesión **consumiendo
+`/internal/session` de stock-api** (introspección, con cache de 60 s). Ninguno de
+los dos servicios de negocio se expone directamente: la única puerta es stock-api.
+
+### Kubernetes local (kind)
+`stock-api` y `stock-operations` corren como pods en el cluster kind:
+```bash
+task local:up       # crea el cluster (k3d + podman)
+task local:deploy   # construye imágenes, las importa al cluster y aplica infra/k8s/
+task local:seed     # seed dentro del pod de Postgres
+task local:probar   # port-forward a stock-api :3000 para usarlo desde la app
+```
 
 ---
 
@@ -41,26 +63,32 @@ Es fundamental contar con los compiladores y runtimes instalados antes de intent
 
 Una vez instalados los motores de arriba, ejecuta lo siguiente en la raíz de `StockAPP`:
 
-* **Módulos de Go:** `cd backend && go mod tidy && cd ../cliente-sidecar && go mod tidy`
-* **Módulos de Node:** `cd app-desktop && npm install`
+* **Módulos de Go:** `cd backend/services/stock-operations && go mod tidy && cd ../cliente-sidecar && go mod tidy`
+* **Módulos de Node:** `cd app-desktop && npm install && cd ../backend/services/stock-api && npm install`
 * **Imágenes de Docker:** `cd infra && docker compose pull`
 
 ---
 
-## 🚀 3. Comandos para Iniciar el Desarrollo (3 Terminales)
+## 🚀 3. Comandos para Iniciar el Desarrollo
 
-Se deben ejecutar los procesos en tres terminales independientes en el siguiente orden estricto:
+Con [Task](https://taskfile.dev) instalado (desarrollo 100 % local, sin túnel):
 
-### Paso 1: Infraestructura (Base de Datos)
-* **Linux:** `cd infra && docker compose up -d`
-* **Windows:** `cd infra; docker compose up -d`
+```bash
+task infra:up        # Postgres (+ API en contenedores)
+task db:esquema      # aplica backend/services/stock-operations/model/esquema.sql (idempotente, sirve sobre bases vivas)
+task db:seed         # admin@dev.local/admin123 y cajero@dev.local/cajero123
+task backend:run     # servicio Go interno en :8080
+task gateway:run     # gateway TS/Express en :3000
+task app:dev         # app Tauri (usa VITE_API_URL=http://localhost:3000 de .env.development)
+```
 
-### Paso 2: Sidecar (Proxy Seguro)
+Para el modo remoto (app hablando con el servidor real por Tailscale), en vez de
+`backend:run`/`gateway:run` locales se usa el sidecar:
+
 * **Linux:** `cd cliente-sidecar && export TS_AUTHKEY="tskey-auth-XXX" && go run main.go`
 * **Windows:** `cd cliente-sidecar; $env:TS_AUTHKEY="tskey-auth-XXX"; go run main.go`
 
-### Paso 3: App Desktop (Frontend)
-* **Ambos:** `cd app-desktop && npm run tauri dev`
+y la app apunta a `http://localhost:9090` (el default cuando no hay `.env.development`).
 
 ---
 
@@ -72,10 +100,48 @@ Se deben ejecutar los procesos en tres terminales independientes en el siguiente
 
 ## ⚠️ 5. Notas Esenciales y Consideraciones
 
-* **Identidad de Red:** El Frontend debe comunicarse siempre con `http://localhost:9090` (Sidecar).
+* **Identidad de Red:** En remoto el Frontend habla con `http://localhost:9090` (Sidecar); en desarrollo local, con `http://localhost:3000` (gateway).
 * **Auth Keys:** Es necesario generar una `TS_AUTHKEY` reusable desde el panel de Tailscale para desarrollo.
 * **Persistencia:** Los datos se conservan en el volumen de Docker incluso al detener los contenedores con `stop`.
 * **Seguridad:** No subir al repositorio archivos `.env` ni la carpeta `cliente-sidecar/tsnet-state/`.
-* **Conflictos:** Verificar que los puertos **5432** (DB) y **9090** (Proxy) estén libres.
+* **Conflictos:** Verificar que los puertos **5432** (DB), **3000** (gateway), **8080** (Go) y **9090** (Proxy) estén libres.
 
 > **Regla de Oro:** El dispositivo de desarrollo debe estar autenticado en la misma Tailnet que la infraestructura para garantizar la conectividad del túnel.
+
+---
+
+## 🧾 6. Facturación y ARCA
+
+Hoy la facturación es **numeración local** (comprobante interno tipo C para
+monotributo): al tocar «Facturar» en Ventas, el negocio asigna el próximo
+número (`C 0001-00000214`) de forma atómica. **No** se emite comprobante fiscal.
+
+El esquema ya quedó **ARCA-ready** para integrar WSFEv1 más adelante sin migrar
+datos ni tocar la UI: `ventas` tiene `tipo_comprobante` (11 = Factura C),
+`nro_comprobante`, `cae` y `cae_vencimiento` (los dos últimos quedan NULL hasta
+integrar el web service). El camino futuro es:
+
+1. Generar el certificado con el CUIT en el portal de ARCA y darlo de alta para WSAA.
+2. Implementar el cliente WSAA (login CMS) y WSFEv1 (`FECAESolicitar`) primero en homologación.
+3. Reemplazar el asignador local: el número y el CAE pasan a venir de ARCA
+   (ojo con el campo `CondicionIVAReceptorId`, obligatorio desde el manual v4.x).
+
+La **clave fiscal** se carga desde la app (Inicio → Configuración, solo admin)
+y se guarda cifrada (`negocios.clave_fiscal_cifrada`, AES-256-GCM) — la API
+nunca la devuelve, solo informa si hay una configurada. El cliente WSAA del
+punto 2 va a ser quien la descifre internamente (`pkg/api/secreto.go`) para
+autenticarse contra ARCA.
+
+## 🔒 7. Seguridad
+
+- Secretos en reposo: la clave fiscal se cifra con AES-256-GCM antes de
+  guardarse; la clave de cifrado sale de `CONFIG_SECRET_KEY` (mismo patrón
+  que `JWT_SECRET` — con default de desarrollo, **obligatoria en producción**).
+- Escapado: Svelte escapa automáticamente todo lo que se interpola en el
+  markup (`{expresión}`); la app no usa `{@html}` en ningún lado, así que un
+  nombre de producto o proveedor con caracteres raros no puede inyectar HTML.
+- Headers HTTP: tanto `stock-api` como `stock-operations` responden
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y
+  `Referrer-Policy: no-referrer` en cada respuesta.
+- Todas las consultas SQL van parametrizadas (`$1`, `$2`, ...) — nunca se arma
+  una query concatenando texto del usuario.

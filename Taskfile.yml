@@ -1,0 +1,142 @@
+# Manejo de infraestructura y desarrollo de StockAPP
+# Uso: task <nombre>  ·  Listar todo: task --list
+version: "3"
+
+env:
+  # go.mod pide 1.25.7: permite que Go baje el toolchain si el local es más viejo
+  GOTOOLCHAIN: auto
+
+tasks:
+  # ---------- Infraestructura (Docker Compose) ----------
+  infra:up:
+    desc: Levanta Postgres + Tailscale + API en Docker
+    dir: backend/infra
+    cmds:
+      - docker compose up -d
+
+  infra:down:
+    desc: Detiene los contenedores (los datos persisten en el volumen)
+    dir: backend/infra
+    cmds:
+      - docker compose stop
+
+  infra:logs:
+    desc: Sigue los logs de todos los contenedores
+    dir: backend/infra
+    cmds:
+      - docker compose logs -f
+
+  infra:destroy:
+    desc: Borra contenedores Y datos (pide confirmación)
+    dir: backend/infra
+    prompt: Esto borra el volumen de la base de datos. ¿Segura?
+    cmds:
+      - docker compose down -v
+
+  # ---------- Base de datos ----------
+  db:esquema:
+    desc: Aplica esquema.sql sobre la base ya corriendo
+    cmds:
+      - docker exec -i db_sistema_stock psql -U admin_dev -d stock_db -v ON_ERROR_STOP=1 < backend/services/stock-operations/model/esquema.sql
+
+  db:seed:
+    desc: Carga el negocio y admin de prueba (admin@dev.local / admin123)
+    cmds:
+      - docker exec -i db_sistema_stock psql -U admin_dev -d stock_db -v ON_ERROR_STOP=1 < backend/services/stock-operations/model/seed_dev.sql
+
+  db:importar:
+    desc: Importa productos_limpios.csv al catálogo maestro
+    dir: backend/services/stock-operations
+    cmds:
+      - go run pkg/importar_db.go
+
+  db:psql:
+    desc: Abre una consola psql contra la base
+    interactive: true
+    cmds:
+      - docker exec -it db_sistema_stock psql -U admin_dev -d stock_db
+
+  # ---------- Desarrollo local ----------
+  backend:run:
+    desc: Corre el servicio interno Go (sin Docker, contra localhost:5432)
+    dir: backend/services/stock-operations
+    cmds:
+      - go run .
+
+  gateway:run:
+    desc: Corre el gateway TS/Express en :3000 (usuarios + proxy al Go interno)
+    dir: backend/services/stock-api
+    cmds:
+      - npm run dev
+
+  sidecar:run:
+    desc: Corre el proxy sidecar (necesita TS_AUTHKEY en el entorno)
+    dir: cliente-sidecar
+    preconditions:
+      - sh: test -n "$TS_AUTHKEY"
+        msg: "Falta TS_AUTHKEY — generarla en el panel de Tailscale"
+    cmds:
+      - go run main.go
+
+  app:dev:
+    desc: Corre la app de escritorio (Tauri + Svelte)
+    dir: app-desktop
+    cmds:
+      - npm run tauri dev
+
+  # ---------- Verificación (lo mismo que corre el CI) ----------
+  ci:
+    desc: Compila y chequea backend, gateway y sidecar
+    cmds:
+      - cd backend/services/stock-operations && go build -v ./... && go vet ./...
+      - cd cliente-sidecar && go build -v ./... && go vet ./...
+      - cd backend/services/stock-api && npm run check
+
+  # ---------- Kubernetes local (k3d sobre podman) ----------
+  # k3d habla con podman por su socket docker-compatible:
+  #   systemctl --user enable --now podman.socket
+  local:up:
+    desc: Crea el cluster local de Kubernetes con k3d
+    env: &k3d_env
+      DOCKER_HOST: unix:///run/user/1000/podman/podman.sock
+      DOCKER_SOCK: /run/user/1000/podman/podman.sock
+    cmds:
+      # --kubelet-arg feature-gate: rootless podman containers can't open
+      # /dev/kmsg, which crashes the kubelet's OOM watcher on startup unless
+      # this is set (k3s logs point at this exact fix).
+      - k3d cluster create stockapp --k3s-arg "--kubelet-arg=feature-gates=KubeletInUserNamespace=true@server:*"
+
+  local:deploy:
+    desc: Construye las imágenes, las importa al cluster y aplica los manifests
+    env: *k3d_env
+    cmds:
+      - podman build -t localhost/stock-api:dev backend/services/stock-api
+      - podman build -t localhost/stock-operations:dev backend/services/stock-operations
+      - podman save localhost/stock-api:dev -o /tmp/stock-api.tar && k3d image import /tmp/stock-api.tar -c stockapp && rm /tmp/stock-api.tar
+      - podman save localhost/stock-operations:dev -o /tmp/stock-operations.tar && k3d image import /tmp/stock-operations.tar -c stockapp && rm /tmp/stock-operations.tar
+      - kubectl --context k3d-stockapp create configmap esquema-sql --from-file=01_esquema.sql=backend/services/stock-operations/model/esquema.sql --dry-run=client -o yaml | kubectl --context k3d-stockapp apply -f -
+      - kubectl --context k3d-stockapp apply -f backend/infra/kubernetes/
+      - kubectl --context k3d-stockapp rollout status deployment/postgres deployment/stock-api deployment/stock-operations --timeout=180s
+
+  local:seed:
+    desc: Aplica el seed de desarrollo dentro del pod de Postgres del cluster
+    cmds:
+      - kubectl --context k3d-stockapp exec -i deployment/postgres -- psql -U admin_dev -d stock_db -v ON_ERROR_STOP=1 < backend/services/stock-operations/model/seed_dev.sql
+
+  local:probar:
+    desc: Port-forward a stock-api (:3000) para probar el cluster desde afuera
+    interactive: true
+    cmds:
+      - kubectl --context k3d-stockapp port-forward service/stock-api 3000:3000
+
+  local:down:
+    desc: Borra el cluster local
+    env: *k3d_env
+    cmds:
+      - k3d cluster delete stockapp
+
+  k9s:
+    desc: Abre k9s apuntando al cluster local
+    interactive: true
+    cmds:
+      - k9s --context k3d-stockapp

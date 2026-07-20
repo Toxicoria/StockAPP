@@ -22,16 +22,29 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
-          cache-dependency-path: cliente-sidecar/go.sum
+          cache-dependency-path: |
+            backend/services/stock-operations/go.sum
+            cliente-sidecar/go.sum
 
-      - name: 📦 Verificar Backend (API)
-        working-directory: ./backend
+      - name: 📦 Verificar stock-operations (Go)
+        working-directory: ./backend/services/stock-operations
         run: |
-          go mod tidy
           go build -v ./...
+          go vet ./...
 
       - name: 👻 Verificar Cliente Sidecar
         working-directory: ./cliente-sidecar
         run: |
-          go mod tidy
           go build -v ./...
+          go vet ./...
+
+      - name: 🟦 Instalar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 🚪 Verificar stock-api (TypeScript)
+        working-directory: ./backend/services/stock-api
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
