@@ -7,9 +7,11 @@ import "net/http"
 func Router() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Pública: health check (la usan las probes de Kubernetes).
-	// Login/refresh/logout ya no viven acá: los maneja stock-api.
+	// Públicas: sin autenticación.
 	mux.HandleFunc("GET /api/ping", conCORS(pingHandler))
+	// Registro inicial del negocio (solo funciona si no hay negocios aún).
+	mux.HandleFunc("GET /api/registro", conCORS(negocioRegistradoHandler))
+	mux.HandleFunc("POST /api/registro", conCORS(registroHandler))
 
 	// Protegidas: exigen "Authorization: Bearer <access token>"
 	mux.HandleFunc("GET /api/productos", conCORS(conAuth(listarProductosHandler)))
@@ -29,6 +31,10 @@ func Router() *http.ServeMux {
 	mux.HandleFunc("GET /api/negocio", conCORS(conAuth(negocioHandler)))
 	mux.HandleFunc("PUT /api/negocio", conCORS(conAuth(editarNegocioHandler)))
 	mux.HandleFunc("GET /api/resumen", conCORS(conAuth(resumenHandler)))
+	mux.HandleFunc("GET /api/usuarios", conCORS(conAuth(listarUsuariosHandler)))
+	mux.HandleFunc("POST /api/usuarios", conCORS(conAuth(crearUsuarioHandler)))
+	mux.HandleFunc("PUT /api/usuarios/{id_usuario}", conCORS(conAuth(editarUsuarioHandler)))
+	mux.HandleFunc("DELETE /api/usuarios/{id_usuario}", conCORS(conAuth(eliminarUsuarioHandler)))
 
 	// Preflight CORS: el mux con patrones "MÉTODO /ruta" respondería 405 a
 	// OPTIONS si no hubiera un catch-all; conCORS corta con 204.

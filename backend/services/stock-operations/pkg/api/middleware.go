@@ -145,7 +145,7 @@ func negocioDe(r *http.Request) int {
 	return int(negocio)
 }
 
-// rolDe devuelve el rol ('admin' o 'cajero') del usuario autenticado.
+// rolDe devuelve el rol ('dueño' o 'cajero') del usuario autenticado.
 func rolDe(r *http.Request) string {
 	rol, _ := claimsDe(r)["rol"].(string)
 	return rol

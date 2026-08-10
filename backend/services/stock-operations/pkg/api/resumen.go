@@ -23,8 +23,8 @@ type topProducto struct {
 // qué se vende más y cuántos productos hay que reponer. Solo admin.
 // GET /api/resumen
 func resumenHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede ver el resumen")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede ver el resumen")
 		return
 	}
 	negocio := negocioDe(r)

@@ -1,6 +1,6 @@
 <script>
   import { goto } from '$app/navigation';
-  import { sesion, esAdmin, haySesion, cerrarSesion } from '$lib/sesion.svelte.js';
+  import { sesion, esDueno, haySesion, cerrarSesion } from '$lib/sesion.svelte.js';
   import { pedirApi } from '$lib/api.js';
 
   let alertas = $state(0);
@@ -19,7 +19,7 @@
     goto('/login');
   }
 
-  const rolEtiqueta = $derived(esAdmin() ? 'Dueño/a · ve todo' : 'Empleado · caja y stock');
+  const rolEtiqueta = $derived(esDueno() ? 'Dueño/a · ve todo' : 'Empleado · caja y stock');
 </script>
 
 <div class="hub">
@@ -50,7 +50,7 @@
       <span class="text-muted detalle">La caja del día, venta por venta.</span>
     </button>
 
-    {#if esAdmin()}
+    {#if esDueno()}
       <button class="accion" onclick={() => goto('/resumen')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
         <span class="nombre">Resumen</span>
@@ -73,6 +73,12 @@
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
         <span class="nombre">Facturación</span>
         <span class="text-muted detalle">Las facturas emitidas, todas juntas.</span>
+      </button>
+
+      <button class="accion" onclick={() => goto('/usuarios')}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span class="nombre">Usuarios</span>
+        <span class="text-muted detalle">Crear y gestionar empleados del negocio.</span>
       </button>
 
       <button class="accion" onclick={() => goto('/configuracion')}>

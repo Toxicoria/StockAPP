@@ -56,8 +56,8 @@ func listarProveedoresHandler(w http.ResponseWriter, r *http.Request) {
 // crearProveedorHandler da de alta un proveedor del negocio. Solo admin.
 // POST /api/proveedores  body: {"nombre": "Dulces del Valle"}
 func crearProveedorHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede crear proveedores")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede crear proveedores")
 		return
 	}
 
@@ -90,8 +90,8 @@ func crearProveedorHandler(w http.ResponseWriter, r *http.Request) {
 // y el resultado se redondea a la decena, como se hace en el mostrador.
 // Solo admin. POST /api/proveedores/{id_proveedor}/aumento  body: {"porcentaje": 12.5}
 func aplicarAumentoHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede cambiar precios")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede cambiar precios")
 		return
 	}
 

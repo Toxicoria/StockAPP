@@ -12,14 +12,16 @@ import (
 var errProveedorAjeno = errors.New("proveedor ajeno")
 
 type itemStock struct {
-	IDProducto  string  `json:"id_producto"`
-	Descripcion string  `json:"descripcion"`
-	Marca       string  `json:"marca"`
-	Cantidad    float64 `json:"cantidad_disponible"`
-	Precio      float64 `json:"precio_venta"`
-	StockMinimo float64 `json:"stock_minimo"`
-	IDProveedor *int    `json:"id_proveedor"`
-	Proveedor   string  `json:"proveedor"`
+	IDProducto           string  `json:"id_producto"`
+	Descripcion          string  `json:"descripcion"`
+	Marca                string  `json:"marca"`
+	CantidadPresentacion string  `json:"cantidad_presentacion"`
+	UnidadMedida         string  `json:"unidad_medida"`
+	Cantidad             float64 `json:"cantidad_disponible"`
+	Precio               float64 `json:"precio_venta"`
+	StockMinimo          float64 `json:"stock_minimo"`
+	IDProveedor          *int    `json:"id_proveedor"`
+	Proveedor            string  `json:"proveedor"`
 }
 
 // listarStockHandler devuelve el inventario del negocio del usuario
@@ -30,6 +32,8 @@ func listarStockHandler(w http.ResponseWriter, r *http.Request) {
 		`SELECT s.id_producto,
 		        COALESCE(p.productos_descripcion, ''),
 		        COALESCE(p.productos_marca, ''),
+		        COALESCE(p.productos_cantidad_presentacion, ''),
+		        COALESCE(p.productos_unidad_medida_presentacion, ''),
 		        s.cantidad_disponible,
 		        s.precio_venta,
 		        COALESCE(s.stock_minimo, 0),
@@ -50,8 +54,8 @@ func listarStockHandler(w http.ResponseWriter, r *http.Request) {
 	items := []itemStock{}
 	for filas.Next() {
 		var i itemStock
-		if err := filas.Scan(&i.IDProducto, &i.Descripcion, &i.Marca, &i.Cantidad, &i.Precio,
-			&i.StockMinimo, &i.IDProveedor, &i.Proveedor); err != nil {
+		if err := filas.Scan(&i.IDProducto, &i.Descripcion, &i.Marca, &i.CantidadPresentacion, &i.UnidadMedida,
+			&i.Cantidad, &i.Precio, &i.StockMinimo, &i.IDProveedor, &i.Proveedor); err != nil {
 			logger.Error("stock: error leyendo fila: %v", err)
 			responderError(w, http.StatusInternalServerError, "error leyendo el inventario")
 			return
@@ -113,8 +117,8 @@ func actualizarStockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Modo absoluto: setear precio/cantidad/mínimo/proveedor. Solo admin.
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede modificar el stock")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede modificar el stock")
 		return
 	}
 	if !hayAbsolutos {

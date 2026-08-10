@@ -94,8 +94,8 @@ type facturaListada struct {
 // listarFacturasHandler devuelve las ventas facturadas de un día (por
 // defecto, hoy). Solo admin. GET /api/facturas?fecha=2026-07-18
 func listarFacturasHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede ver la facturación")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede ver la facturación")
 		return
 	}
 	fecha := r.URL.Query().Get("fecha")
@@ -138,12 +138,20 @@ func listarFacturasHandler(w http.ResponseWriter, r *http.Request) {
 // GET /api/negocio
 func negocioHandler(w http.ResponseWriter, r *http.Request) {
 	var nombre, direccion, cuit, puntoVenta string
+	var nombreDueno, telefono, emailNegocio string
 	var hayClaveFiscal bool
 	err := db.DB.QueryRow(
-		`SELECT nombre_negocio, COALESCE(direccion, ''), COALESCE(cuit, ''), COALESCE(punto_venta, '0001'),
-		        clave_fiscal_cifrada IS NOT NULL
+		`SELECT nombre_negocio,
+		        COALESCE(direccion, ''),
+		        COALESCE(cuit, ''),
+		        COALESCE(punto_venta, '0001'),
+		        clave_fiscal_cifrada IS NOT NULL,
+		        COALESCE(nombre_dueno, ''),
+		        COALESCE(telefono, ''),
+		        COALESCE(email_negocio, '')
 		   FROM negocios WHERE id_negocio = $1`, negocioDe(r)).
-		Scan(&nombre, &direccion, &cuit, &puntoVenta, &hayClaveFiscal)
+		Scan(&nombre, &direccion, &cuit, &puntoVenta, &hayClaveFiscal,
+			&nombreDueno, &telefono, &emailNegocio)
 	if err != nil {
 		logger.Error("negocio: error consultando datos: %v", err)
 		responderError(w, http.StatusInternalServerError, "error consultando el negocio")
@@ -155,6 +163,9 @@ func negocioHandler(w http.ResponseWriter, r *http.Request) {
 		"cuit":                     cuit,
 		"punto_venta":              puntoVenta,
 		"clave_fiscal_configurada": hayClaveFiscal,
+		"nombre_dueno":             nombreDueno,
+		"telefono":                 telefono,
+		"email_negocio":            emailNegocio,
 	})
 }
 
@@ -167,13 +178,16 @@ type cuerpoNegocio struct {
 	Cuit          *string `json:"cuit"`
 	PuntoVenta    *string `json:"punto_venta"`
 	ClaveFiscal   *string `json:"clave_fiscal"`
+	NombreDueno   *string `json:"nombre_dueno"`
+	Telefono      *string `json:"telefono"`
+	EmailNegocio  *string `json:"email_negocio"`
 }
 
 // editarNegocioHandler actualiza la configuración del negocio. Solo admin.
 // PUT /api/negocio
 func editarNegocioHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede editar la configuración")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede editar la configuración")
 		return
 	}
 
@@ -203,10 +217,14 @@ func editarNegocioHandler(w http.ResponseWriter, r *http.Request) {
 		        direccion      = COALESCE($3, direccion),
 		        cuit           = COALESCE($4, cuit),
 		        punto_venta    = COALESCE($5, punto_venta),
-		        clave_fiscal_cifrada = CASE WHEN $6 THEN $7::bytea ELSE clave_fiscal_cifrada END
+		        clave_fiscal_cifrada = CASE WHEN $6 THEN $7::bytea ELSE clave_fiscal_cifrada END,
+		        nombre_dueno   = COALESCE($8, nombre_dueno),
+		        telefono       = COALESCE($9, telefono),
+		        email_negocio  = COALESCE($10, email_negocio)
 		  WHERE id_negocio = $1`,
 		negocioDe(r), cuerpo.NombreNegocio, cuerpo.Direccion, cuerpo.Cuit, cuerpo.PuntoVenta,
-		tocarClave, claveCifradaNueva)
+		tocarClave, claveCifradaNueva,
+		cuerpo.NombreDueno, cuerpo.Telefono, cuerpo.EmailNegocio)
 	if err != nil {
 		logger.Error("negocio: error actualizando configuración: %v", err)
 		responderError(w, http.StatusInternalServerError, "no se pudo guardar la configuración")

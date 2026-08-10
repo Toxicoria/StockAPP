@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     nombre VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    rol VARCHAR(50) DEFAULT 'cajero', -- Puede ser 'admin' o 'cajero'
+    rol VARCHAR(50) DEFAULT 'cajero', -- 'dueño' o 'cajero'
     fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_negocio) REFERENCES negocios(id_negocio) ON DELETE CASCADE
 );
@@ -129,5 +129,10 @@ ALTER TABLE negocios ADD COLUMN IF NOT EXISTS proximo_numero_factura INT NOT NUL
 -- Clave fiscal de ARCA (u otro secreto del negocio): se guarda cifrada
 -- (AES-256-GCM, ver pkg/api/secreto.go) y nunca se devuelve por la API.
 ALTER TABLE negocios ADD COLUMN IF NOT EXISTS clave_fiscal_cifrada BYTEA;
+
+-- Datos de contacto del negocio (recabados en el onboarding inicial).
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS nombre_dueno   VARCHAR(150);
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS telefono       VARCHAR(50);
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS email_negocio  VARCHAR(150);
 
 CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha_hora);

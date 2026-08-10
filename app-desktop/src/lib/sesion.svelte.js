@@ -12,8 +12,8 @@ export const sesion = $state({
   negocio: '', // nombre del negocio, para la barra de título
 });
 
-export function esAdmin() {
-  return sesion.rol === 'admin';
+export function esDueno() {
+  return sesion.rol === 'dueño';
 }
 
 export function haySesion() {

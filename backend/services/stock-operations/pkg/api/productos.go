@@ -82,12 +82,15 @@ func listarProductosHandler(w http.ResponseWriter, r *http.Request) {
 // El "producto" que ve la UI es catálogo + inventario: la descripción vive en
 // productos (catálogo global, PK = código de barras) y el resto en stock_interno.
 type cuerpoProducto struct {
-	Descripcion  *string  `json:"descripcion"`
-	CodigoBarras *string  `json:"codigo_barras"`
-	Precio       *float64 `json:"precio_venta"`
-	Cantidad     *float64 `json:"cantidad_disponible"`
-	StockMinimo  *float64 `json:"stock_minimo"`
-	IDProveedor  *int     `json:"id_proveedor"`
+	Descripcion          *string  `json:"descripcion"`
+	CodigoBarras         *string  `json:"codigo_barras"`
+	Precio               *float64 `json:"precio_venta"`
+	Cantidad             *float64 `json:"cantidad_disponible"`
+	StockMinimo          *float64 `json:"stock_minimo"`
+	IDProveedor          *int     `json:"id_proveedor"`
+	Marca                *string  `json:"marca"`
+	CantidadPresentacion *string  `json:"cantidad_presentacion"`
+	UnidadMedida         *string  `json:"unidad_medida"`
 }
 
 // crearProductoHandler da de alta un producto en el inventario del negocio.
@@ -95,8 +98,8 @@ type cuerpoProducto struct {
 // toca. Sin código de barras se genera un id local "LOC-xxxxxxxx" (producto
 // propio del negocio, ej. torta casera). Solo admin. POST /api/productos
 func crearProductoHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede crear productos")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede crear productos")
 		return
 	}
 
@@ -138,12 +141,29 @@ func crearProductoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Catálogo global: solo se inserta si el código no existía (D1); una
-	// descripción ya cargada por otro negocio no se pisa al crear.
+	// Catálogo global: inserta o actualiza marca, presentación y medida si vienen vacíos.
+	cantPres := ""
+	if cuerpo.CantidadPresentacion != nil {
+		cantPres = *cuerpo.CantidadPresentacion
+	}
+	uniMed := ""
+	if cuerpo.UnidadMedida != nil {
+		uniMed = *cuerpo.UnidadMedida
+	}
+	marca := ""
+	if cuerpo.Marca != nil {
+		marca = *cuerpo.Marca
+	}
+
 	if _, err := tx.Exec(
-		`INSERT INTO productos (id_producto, productos_descripcion)
-		 VALUES ($1, $2)
-		 ON CONFLICT (id_producto) DO NOTHING`, idProducto, *cuerpo.Descripcion); err != nil {
+		`INSERT INTO productos (id_producto, productos_descripcion, productos_cantidad_presentacion, productos_unidad_medida_presentacion, productos_marca)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (id_producto) DO UPDATE SET
+		    productos_descripcion = EXCLUDED.productos_descripcion,
+		    productos_cantidad_presentacion = CASE WHEN EXCLUDED.productos_cantidad_presentacion <> '' THEN EXCLUDED.productos_cantidad_presentacion ELSE productos.productos_cantidad_presentacion END,
+		    productos_unidad_medida_presentacion = CASE WHEN EXCLUDED.productos_unidad_medida_presentacion <> '' THEN EXCLUDED.productos_unidad_medida_presentacion ELSE productos.productos_unidad_medida_presentacion END,
+		    productos_marca = CASE WHEN EXCLUDED.productos_marca <> '' THEN EXCLUDED.productos_marca ELSE productos.productos_marca END`,
+		idProducto, *cuerpo.Descripcion, cantPres, uniMed, marca); err != nil {
 		logger.Error("productos: error insertando %s en catálogo: %v", idProducto, err)
 		responderError(w, http.StatusInternalServerError, "no se pudo crear el producto")
 		return
@@ -177,8 +197,8 @@ func crearProductoHandler(w http.ResponseWriter, r *http.Request) {
 // se toca). La descripción edita el catálogo global — aceptado mientras haya
 // un solo negocio (riesgo D1). Solo admin. PUT /api/productos/{id_producto}
 func editarProductoHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede editar productos")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede editar productos")
 		return
 	}
 
@@ -226,11 +246,16 @@ func editarProductoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if cuerpo.Descripcion != nil && *cuerpo.Descripcion != "" {
+	if (cuerpo.Descripcion != nil && *cuerpo.Descripcion != "") || cuerpo.CantidadPresentacion != nil || cuerpo.UnidadMedida != nil || cuerpo.Marca != nil {
 		if _, err := tx.Exec(
-			`UPDATE productos SET productos_descripcion = $2 WHERE id_producto = $1`,
-			idProducto, *cuerpo.Descripcion); err != nil {
-			logger.Error("productos: error editando descripción de %s: %v", idProducto, err)
+			`UPDATE productos
+			    SET productos_descripcion = COALESCE($2, productos_descripcion),
+			        productos_cantidad_presentacion = COALESCE($3, productos_cantidad_presentacion),
+			        productos_unidad_medida_presentacion = COALESCE($4, productos_unidad_medida_presentacion),
+			        productos_marca = COALESCE($5, productos_marca)
+			  WHERE id_producto = $1`,
+			idProducto, cuerpo.Descripcion, cuerpo.CantidadPresentacion, cuerpo.UnidadMedida, cuerpo.Marca); err != nil {
+			logger.Error("productos: error editando catálogo de %s: %v", idProducto, err)
 			responderError(w, http.StatusInternalServerError, "no se pudo editar el producto")
 			return
 		}
@@ -250,8 +275,8 @@ func editarProductoHandler(w http.ResponseWriter, r *http.Request) {
 // detalles_venta apuntan a productos, no a stock_interno). Solo admin.
 // DELETE /api/productos/{id_producto}
 func eliminarProductoHandler(w http.ResponseWriter, r *http.Request) {
-	if rolDe(r) != "admin" {
-		responderError(w, http.StatusForbidden, "solo un admin puede eliminar productos")
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede eliminar productos")
 		return
 	}
 
