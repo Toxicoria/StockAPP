@@ -1,65 +1,67 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Node.js & Frontend (SvelteKit / Vite)
+**/node_modules/
+**/.svelte-kit/
+**/.vite/
+**/dist/
+**/build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust & Tauri
+**/target/
+**/src-tauri/gen/
+
+# Go
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with `go test -c`
 *.test
-
-# Code coverage profiles and other test artifacts
 *.out
 coverage.*
 *.coverprofile
 profile.cov
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
 go.work
 go.work.sum
+**/vendor/
 
-# env file
-.env
-
-# Editor/IDE
-# .idea/
-# .vscode/
-
-# Secretos y Entorno
-.env
-.env.*
-
-# Archivos de Tailscale (¡Vital!)
-cliente-sidecar/tsnet-state/
-
-# Infraestructura
-infra/postgres_data/
-
-# Dependencias y compilados pesados
-app-desktop/node_modules/
-app-desktop/.svelte-kit/
-app-desktop/src-tauri/target/
-app-desktop/build/
-backend/services/stock-api/node_modules/
-backend/services/stock-api/dist/
-
-# La URL de la API en dev no es secreto: se versiona a propósito
-!app-desktop/.env.development
-
-# Binarios compilados
+# Binarios compilados específicos
 backend/services/stock-operations/backend
 backend/services/stock-operations/main
 backend/services/stock-operations/stock-operations
 cliente-sidecar/cliente-sidecar
-# archivos de datos masivos
+bin/
+
+# Entorno y Secretos
+.env
+.env.*
+!app-desktop/.env.development
+process-compose.yaml
+cliente-sidecar/tsnet-state/
+**/tsnet-state/
+
+# Infraestructura y Archivos de datos masivos
+infra/postgres_data/
 backend/services/stock-operations/lote_csv/
 
-# Process Compose (contiene secrets, no subir)
-process-compose.yaml
-bin/
+# IDE, Editores y Sistema Operativo
+.idea/
+.vscode/
+.zed/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs y Temporales
+*.log
+*.tmp
+*.temp
+
+# Agentes y Documentación Markdown
+.agents/
+*.md
