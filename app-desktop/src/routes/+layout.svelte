@@ -1,24 +1,39 @@
 <script>
   import '$lib/estilos/diseno.css';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
   import BarraTitulo from '$lib/componentes/BarraTitulo.svelte';
   import Toast from '$lib/componentes/Toast.svelte';
-  import { sesion, haySesion, refrescar } from '$lib/sesion.svelte.js';
-  import { pedirApi } from '$lib/api.js';
+  import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
+  import {
+    estadoConfirmacion,
+    solicitarCerrarApp,
+    cancelarCerrarApp,
+    confirmarCerrarApp,
+  } from '$lib/confirmacion.svelte.js';
   import { BASE_API } from '$lib/config.js';
 
   let { children } = $props();
 
-  // Al arrancar, la app primero chequea si hay un negocio registrado.
-  // Si no lo hay, redirige al wizard de configuración inicial.
-  // Si lo hay, intenta revivir la sesión con el refresh token guardado;
-  // hasta resolver eso no se muestra nada (evita el parpadeo de una
-  // pantalla a la que después te echa).
   let restaurando = $state(true);
+  /** @type {(() => void) | null} */
+  let desescucharCierre = null;
 
   onMount(async () => {
+    // Interceptar solicitudes de cierre nativas en Tauri (Alt+F4, botón de cerrar de ventana del SO, etc.)
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const appWindow = getCurrentWindow();
+        desescucharCierre = await appWindow.onCloseRequested((event) => {
+          event.preventDefault();
+          solicitarCerrarApp();
+        });
+      } catch (e) {
+        console.error('No se pudo registrar handler de cierre en Tauri:', e);
+      }
+    }
+
     try {
       // Si ya estamos en /setup, no hacer nada más.
       if (window.location.pathname.startsWith('/setup')) {
@@ -37,17 +52,18 @@
         }
       }
 
-      // Hay negocio: intentar revivir la sesión.
-      const viva = await refrescar();
-      if (viva) {
-        pedirApi('/api/negocio')
-          .then((n) => (sesion.negocio = n.nombre_negocio))
-          .catch(() => {});
-      } else if (window.location.pathname !== '/login') {
+      // Hay negocio: al arrancar la app siempre mostramos la pantalla de inicio de sesión (/login)
+      if (window.location.pathname !== '/login') {
         await goto('/login');
       }
     } finally {
       restaurando = false;
+    }
+  });
+
+  onDestroy(() => {
+    if (desescucharCierre) {
+      desescucharCierre();
     }
   });
 </script>
@@ -60,6 +76,17 @@
     {/if}
   </main>
   <Toast />
+
+  <ModalConfirmacion
+    abierto={estadoConfirmacion.cerrarApp}
+    titulo="¿Salir de StockAPP?"
+    mensaje="¿Estás seguro de que querés cerrar la aplicación?"
+    textoConfirmar="Sí, salir"
+    textoCancelar="Cancelar"
+    variante="peligro"
+    onconfirmar={confirmarCerrarApp}
+    oncancelar={cancelarCerrarApp}
+  />
 </div>
 
 <style>

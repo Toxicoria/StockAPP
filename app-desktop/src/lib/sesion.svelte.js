@@ -4,6 +4,7 @@
 import { BASE_API } from '$lib/config.js';
 
 const CLAVE_REFRESH = 'refresh_token';
+const CLAVE_USUARIOS_RECIENTES = 'usuarios_recientes';
 
 export const sesion = $state({
   nombre: '',
@@ -18,6 +19,47 @@ export function esDueno() {
 
 export function haySesion() {
   return sesion.accessToken !== '';
+}
+
+/**
+ * @returns {Array<{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean, ultimaSesion: number }>}
+ */
+export function obtenerUsuariosRecientes() {
+  try {
+    const raw = localStorage.getItem(CLAVE_USUARIOS_RECIENTES);
+    if (!raw) return [];
+    const lista = JSON.parse(raw);
+    return Array.isArray(lista) ? lista : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * @param {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean }} u
+ */
+export function guardarUsuarioReciente(u) {
+  if (!u || !u.email) return;
+  const lista = obtenerUsuariosRecientes().filter((item) => item.email !== u.email);
+  lista.unshift({
+    email: u.email,
+    nombre: u.nombre || u.email.split('@')[0],
+    rol: u.rol || 'cajero',
+    password: u.recordarPassword ? (u.password || '') : '',
+    recordarPassword: Boolean(u.recordarPassword),
+    ultimaSesion: Date.now(),
+  });
+  // Mantener como máximo 6 usuarios recientes
+  const recortada = lista.slice(0, 6);
+  localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(recortada));
+}
+
+/**
+ * @param {string} email
+ */
+export function eliminarUsuarioReciente(email) {
+  const lista = obtenerUsuariosRecientes().filter((item) => item.email !== email);
+  localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(lista));
 }
 
 /** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string }} datos */
@@ -38,8 +80,9 @@ function limpiar() {
 /**
  * @param {string} email
  * @param {string} password
+ * @param {boolean} [recordarPassword=true]
  */
-export async function iniciarSesion(email, password) {
+export async function iniciarSesion(email, password, recordarPassword = true) {
   const resp = await fetch(`${BASE_API}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -48,6 +91,13 @@ export async function iniciarSesion(email, password) {
   const datos = await resp.json();
   if (!resp.ok) throw new Error(datos.error ?? 'no se pudo iniciar sesión');
   guardarTokens(datos);
+  guardarUsuarioReciente({
+    email,
+    nombre: datos.nombre,
+    rol: datos.rol,
+    password,
+    recordarPassword,
+  });
 }
 
 // refrescar canjea el refresh token guardado por un par nuevo (rotación).

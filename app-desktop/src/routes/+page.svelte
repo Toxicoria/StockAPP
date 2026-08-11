@@ -2,6 +2,12 @@
   import { goto } from '$app/navigation';
   import { sesion, esDueno, haySesion, cerrarSesion } from '$lib/sesion.svelte.js';
   import { pedirApi } from '$lib/api.js';
+  import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
+  import {
+    estadoConfirmacion,
+    solicitarCerrarSesion,
+    cancelarCerrarSesion,
+  } from '$lib/confirmacion.svelte.js';
 
   let alertas = $state(0);
 
@@ -14,7 +20,8 @@
       .catch(() => {});
   });
 
-  async function salir() {
+  async function ejecutarCerrarSesion() {
+    cancelarCerrarSesion();
     await cerrarSesion();
     goto('/login');
   }
@@ -91,9 +98,20 @@
 
   <div class="pie">
     <span class="text-muted">{sesion.nombre} · {rolEtiqueta}</span>
-    <button class="btn btn-ghost" onclick={salir}>Cerrar sesión</button>
+    <button class="btn btn-ghost" onclick={solicitarCerrarSesion}>Cerrar sesión</button>
   </div>
 </div>
+
+<ModalConfirmacion
+  abierto={estadoConfirmacion.cerrarSesion}
+  titulo="¿Cerrar sesión?"
+  mensaje="¿Estás seguro de que querés salir de tu cuenta?"
+  textoConfirmar="Sí, cerrar sesión"
+  textoCancelar="Cancelar"
+  variante="peligro"
+  onconfirmar={ejecutarCerrarSesion}
+  oncancelar={cancelarCerrarSesion}
+/>
 
 <style>
   .hub { max-width: 980px; margin: 0 auto; }

@@ -1,5 +1,6 @@
 <script>
   import { sesion } from '$lib/sesion.svelte.js';
+  import { solicitarCerrarApp } from '$lib/confirmacion.svelte.js';
 
   // Fuera de Tauri (vite dev en el navegador) los botones no hacen nada
   // pero tampoco rompen: la API de ventana solo se invoca si existe.
@@ -16,8 +17,8 @@
   async function maximizar() {
     if (enTauri) (await ventana()).toggleMaximize();
   }
-  async function cerrar() {
-    if (enTauri) (await ventana()).close();
+  function cerrar() {
+    solicitarCerrarApp();
   }
 </script>
 

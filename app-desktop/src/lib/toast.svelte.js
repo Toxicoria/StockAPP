@@ -1,4 +1,5 @@
 // Sistema de notificaciones tipo Toast con Runas de Svelte 5.
+/** @type {Array<{ id: number, mensaje: string, tipo: string }>} */
 export const toasts = $state([]);
 
 /**
