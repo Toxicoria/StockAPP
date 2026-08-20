@@ -7,6 +7,7 @@
   import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
   import {
     estadoConfirmacion,
+    permitiendoCierre,
     solicitarCerrarApp,
     cancelarCerrarApp,
     confirmarCerrarApp,
@@ -26,6 +27,10 @@
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
         const appWindow = getCurrentWindow();
         desescucharCierre = await appWindow.onCloseRequested((event) => {
+          if (permitiendoCierre.activo) {
+            // El usuario ya aceptó cerrar la app: permitir cierre nativo sin volver a interceptar
+            return;
+          }
           event.preventDefault();
           solicitarCerrarApp();
         });

@@ -9,6 +9,8 @@ const CLAVE_USUARIOS_RECIENTES = 'usuarios_recientes';
 export const sesion = $state({
   nombre: '',
   rol: '',
+  /** @type {string[]} */
+  permisos: ['vender', 'stock'],
   accessToken: '',
   negocio: '', // nombre del negocio, para la barra de título
 });
@@ -19,6 +21,16 @@ export function esDueno() {
 
 export function haySesion() {
   return sesion.accessToken !== '';
+}
+
+/**
+ * @param {string} modulo
+ * @returns {boolean}
+ */
+export function tienePermiso(modulo) {
+  if (esDueno()) return true;
+  if (!Array.isArray(sesion.permisos)) return modulo === 'vender' || modulo === 'stock';
+  return sesion.permisos.includes(modulo);
 }
 
 /**
@@ -62,11 +74,12 @@ export function eliminarUsuarioReciente(email) {
   localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(lista));
 }
 
-/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string }} datos */
+/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string, permisos?: string[] }} datos */
 function guardarTokens(datos) {
   sesion.accessToken = datos.access_token;
   sesion.nombre = datos.nombre;
   sesion.rol = datos.rol;
+  sesion.permisos = Array.isArray(datos.permisos) ? datos.permisos : ['vender', 'stock'];
   localStorage.setItem(CLAVE_REFRESH, datos.refresh_token);
 }
 
@@ -74,25 +87,26 @@ function limpiar() {
   sesion.accessToken = '';
   sesion.nombre = '';
   sesion.rol = '';
+  sesion.permisos = ['vender', 'stock'];
   localStorage.removeItem(CLAVE_REFRESH);
 }
 
 /**
- * @param {string} email
+ * @param {string} identificador
  * @param {string} password
  * @param {boolean} [recordarPassword=true]
  */
-export async function iniciarSesion(email, password, recordarPassword = true) {
+export async function iniciarSesion(identificador, password, recordarPassword = true) {
   const resp = await fetch(`${BASE_API}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, dispositivo: 'app-escritorio' }),
+    body: JSON.stringify({ usuario: identificador, email: identificador, password, dispositivo: 'app-escritorio' }),
   });
   const datos = await resp.json();
   if (!resp.ok) throw new Error(datos.error ?? 'no se pudo iniciar sesión');
   guardarTokens(datos);
   guardarUsuarioReciente({
-    email,
+    email: identificador,
     nombre: datos.nombre,
     rol: datos.rol,
     password,
@@ -101,8 +115,6 @@ export async function iniciarSesion(email, password, recordarPassword = true) {
 }
 
 // refrescar canjea el refresh token guardado por un par nuevo (rotación).
-// Devuelve true si la sesión quedó viva. Single-flight: si dos pedidos
-// reciben 401 a la vez, comparten el mismo refresh en curso.
 let refrescando = null;
 
 export function refrescar() {
@@ -131,7 +143,6 @@ export function refrescar() {
 export async function cerrarSesion() {
   const refreshToken = localStorage.getItem(CLAVE_REFRESH);
   if (refreshToken) {
-    // Best-effort: si el backend no responde, la sesión local se cierra igual.
     fetch(`${BASE_API}/api/logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

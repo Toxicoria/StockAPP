@@ -233,8 +233,8 @@
         <div class="vista-login" in:fly={{ y: 8, duration: 220, delay: 90 }} out:fade={{ duration: 120 }}>
           <form onsubmit={entrar} class="form-login">
             <div class="field">
-              <label for="email">Email</label>
-              <input id="email" class="input" type="email" bind:value={email} autocomplete="username" placeholder="ejemplo@negocio.com" required />
+              <label for="email">Usuario o Email</label>
+              <input id="email" class="input" type="text" bind:value={email} autocomplete="username" placeholder="Nombre de usuario o email" required />
             </div>
             <div class="field">
               <label for="password">Contraseña</label>

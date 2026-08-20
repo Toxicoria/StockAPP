@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -13,14 +14,18 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var reUsername = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
+
 // usuario representa un usuario del negocio, tal como se lo devuelve al frontend.
 // La contraseña nunca se incluye en la respuesta.
 type usuario struct {
-	ID        int       `json:"id_usuario"`
-	Nombre    string    `json:"nombre"`
-	Email     string    `json:"email"`
-	Rol       string    `json:"rol"`
-	FechaAlta time.Time `json:"fecha_alta"`
+	ID        int             `json:"id_usuario"`
+	Nombre    string          `json:"nombre"`
+	Usuario   *string         `json:"usuario"`
+	Email     *string         `json:"email"`
+	Rol       string          `json:"rol"`
+	Permisos  json.RawMessage `json:"permisos"`
+	FechaAlta time.Time       `json:"fecha_alta"`
 }
 
 // listarUsuariosHandler devuelve todos los usuarios del negocio autenticado.
@@ -32,7 +37,7 @@ func listarUsuariosHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filas, err := db.DB.Query(
-		`SELECT id_usuario, nombre, email, rol, fecha_alta
+		`SELECT id_usuario, nombre, usuario, email, rol, COALESCE(permisos, '["vender", "stock"]'::jsonb), fecha_alta
 		   FROM usuarios
 		  WHERE id_negocio = $1
 		  ORDER BY fecha_alta`, negocioDe(r))
@@ -46,7 +51,7 @@ func listarUsuariosHandler(w http.ResponseWriter, r *http.Request) {
 	usuarios := []usuario{}
 	for filas.Next() {
 		var u usuario
-		if err := filas.Scan(&u.ID, &u.Nombre, &u.Email, &u.Rol, &u.FechaAlta); err != nil {
+		if err := filas.Scan(&u.ID, &u.Nombre, &u.Usuario, &u.Email, &u.Rol, &u.Permisos, &u.FechaAlta); err != nil {
 			logger.Error("usuarios: error leyendo fila: %v", err)
 			responderError(w, http.StatusInternalServerError, "error leyendo los usuarios")
 			return
@@ -58,14 +63,16 @@ func listarUsuariosHandler(w http.ResponseWriter, r *http.Request) {
 
 // cuerpoCrearUsuario son los datos para crear un nuevo empleado.
 type cuerpoCrearUsuario struct {
-	Nombre   string `json:"nombre"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Nombre   string          `json:"nombre"`
+	Usuario  *string         `json:"usuario"`
+	Email    *string         `json:"email"`
+	Password string          `json:"password"`
+	Permisos json.RawMessage `json:"permisos"`
 }
 
 // crearUsuarioHandler crea un nuevo cajero para el negocio. El dueño solo
 // puede crear usuarios con rol 'cajero'. Solo dueño.
-// POST /api/usuarios  body: {"nombre": "...", "email": "...", "password": "..."}
+// POST /api/usuarios
 func crearUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	if rolDe(r) != "dueño" {
 		responderError(w, http.StatusForbidden, "solo el dueño puede crear usuarios")
@@ -77,13 +84,33 @@ func crearUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		responderError(w, http.StatusBadRequest, "cuerpo JSON inválido")
 		return
 	}
-	if cuerpo.Nombre == "" || cuerpo.Email == "" || cuerpo.Password == "" {
-		responderError(w, http.StatusBadRequest, "nombre, email y password son obligatorios")
+	if cuerpo.Nombre == "" || cuerpo.Password == "" {
+		responderError(w, http.StatusBadRequest, "el nombre del empleado y la contraseña son obligatorios")
 		return
 	}
 	if len(cuerpo.Password) < 8 {
 		responderError(w, http.StatusBadRequest, "la contraseña debe tener al menos 8 caracteres")
 		return
+	}
+
+	// Validar usuario (username)
+	if cuerpo.Usuario != nil && *cuerpo.Usuario != "" {
+		if !reUsername.MatchString(*cuerpo.Usuario) {
+			responderError(w, http.StatusBadRequest, "el nombre de usuario no puede contener espacios ni caracteres especiales")
+			return
+		}
+	} else {
+		cuerpo.Usuario = nil
+	}
+
+	// Limpiar email vacío
+	if cuerpo.Email != nil && *cuerpo.Email == "" {
+		cuerpo.Email = nil
+	}
+
+	// Permisos por defecto
+	if len(cuerpo.Permisos) == 0 {
+		cuerpo.Permisos = json.RawMessage(`["vender", "stock"]`)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(cuerpo.Password), bcrypt.DefaultCost)
@@ -95,34 +122,35 @@ func crearUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 
 	var nuevo usuario
 	err = db.DB.QueryRow(
-		`INSERT INTO usuarios (id_negocio, nombre, email, password_hash, rol)
-		 VALUES ($1, $2, $3, $4, 'cajero')
-		 RETURNING id_usuario, nombre, email, rol, fecha_alta`,
-		negocioDe(r), cuerpo.Nombre, cuerpo.Email, string(hash),
-	).Scan(&nuevo.ID, &nuevo.Nombre, &nuevo.Email, &nuevo.Rol, &nuevo.FechaAlta)
+		`INSERT INTO usuarios (id_negocio, nombre, usuario, email, password_hash, rol, permisos)
+		 VALUES ($1, $2, $3, $4, $5, 'cajero', $6::jsonb)
+		 RETURNING id_usuario, nombre, usuario, email, rol, permisos, fecha_alta`,
+		negocioDe(r), cuerpo.Nombre, cuerpo.Usuario, cuerpo.Email, string(hash), string(cuerpo.Permisos),
+	).Scan(&nuevo.ID, &nuevo.Nombre, &nuevo.Usuario, &nuevo.Email, &nuevo.Rol, &nuevo.Permisos, &nuevo.FechaAlta)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
-			responderError(w, http.StatusConflict, "ya existe un usuario con ese email")
+			responderError(w, http.StatusConflict, "ya existe un usuario con ese nombre de usuario en tu negocio")
 			return
 		}
-		logger.Error("usuarios: error creando %q: %v", cuerpo.Email, err)
+		logger.Error("usuarios: error creando %q: %v", cuerpo.Nombre, err)
 		responderError(w, http.StatusInternalServerError, "no se pudo crear el usuario")
 		return
 	}
 
-	logger.Info("usuarios: nuevo cajero #%d (%s) en negocio #%d", nuevo.ID, nuevo.Email, negocioDe(r))
+	logger.Info("usuarios: nuevo cajero #%d (%s) en negocio #%d", nuevo.ID, nuevo.Nombre, negocioDe(r))
 	responderJSON(w, http.StatusCreated, nuevo)
 }
 
-// cuerpoEditarUsuario son los datos editables de un usuario (sin contraseña).
+// cuerpoEditarUsuario son los datos editables de un usuario.
 type cuerpoEditarUsuario struct {
-	Nombre string `json:"nombre"`
-	Email  string `json:"email"`
+	Nombre   string          `json:"nombre"`
+	Usuario  *string         `json:"usuario"`
+	Email    *string         `json:"email"`
+	Permisos json.RawMessage `json:"permisos"`
 }
 
-// editarUsuarioHandler modifica el nombre y/o email de un usuario del negocio.
-// Solo dueño. No permite editar la contraseña (eso sería otro endpoint).
-// PUT /api/usuarios/{id_usuario}  body: {"nombre": "...", "email": "..."}
+// editarUsuarioHandler modifica el nombre, usuario, email y/o permisos de un usuario.
+// PUT /api/usuarios/{id_usuario}
 func editarUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	if rolDe(r) != "dueño" {
 		responderError(w, http.StatusForbidden, "solo el dueño puede editar usuarios")
@@ -140,13 +168,28 @@ func editarUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 		responderError(w, http.StatusBadRequest, "cuerpo JSON inválido")
 		return
 	}
-	if cuerpo.Nombre == "" || cuerpo.Email == "" {
-		responderError(w, http.StatusBadRequest, "nombre y email son obligatorios")
+	if cuerpo.Nombre == "" {
+		responderError(w, http.StatusBadRequest, "el nombre es obligatorio")
 		return
 	}
 
-	// No puede editarse a sí mismo por esta vía (evita que el dueño se
-	// cambie el email y se quede sin acceso por error).
+	if cuerpo.Usuario != nil && *cuerpo.Usuario != "" {
+		if !reUsername.MatchString(*cuerpo.Usuario) {
+			responderError(w, http.StatusBadRequest, "el nombre de usuario no puede contener espacios ni caracteres especiales")
+			return
+		}
+	} else {
+		cuerpo.Usuario = nil
+	}
+
+	if cuerpo.Email != nil && *cuerpo.Email == "" {
+		cuerpo.Email = nil
+	}
+	if len(cuerpo.Permisos) == 0 {
+		cuerpo.Permisos = json.RawMessage(`["vender", "stock"]`)
+	}
+
+	// No puede editarse a sí mismo por esta vía
 	if idUsuario == usuarioDe(r) {
 		responderError(w, http.StatusForbidden, "no podés editar tu propia cuenta desde acá")
 		return
@@ -155,14 +198,14 @@ func editarUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	var editado usuario
 	err = db.DB.QueryRow(
 		`UPDATE usuarios
-		    SET nombre = $1, email = $2
-		  WHERE id_usuario = $3 AND id_negocio = $4
-		  RETURNING id_usuario, nombre, email, rol, fecha_alta`,
-		cuerpo.Nombre, cuerpo.Email, idUsuario, negocioDe(r),
-	).Scan(&editado.ID, &editado.Nombre, &editado.Email, &editado.Rol, &editado.FechaAlta)
+		    SET nombre = $1, usuario = $2, email = $3, permisos = $4::jsonb
+		  WHERE id_usuario = $5 AND id_negocio = $6
+		  RETURNING id_usuario, nombre, usuario, email, rol, permisos, fecha_alta`,
+		cuerpo.Nombre, cuerpo.Usuario, cuerpo.Email, string(cuerpo.Permisos), idUsuario, negocioDe(r),
+	).Scan(&editado.ID, &editado.Nombre, &editado.Usuario, &editado.Email, &editado.Rol, &editado.Permisos, &editado.FechaAlta)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
-			responderError(w, http.StatusConflict, "ya existe un usuario con ese email")
+			responderError(w, http.StatusConflict, "ya existe un usuario con ese nombre de usuario en tu negocio")
 			return
 		}
 		responderError(w, http.StatusNotFound, "usuario no encontrado")
@@ -172,9 +215,60 @@ func editarUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	responderJSON(w, http.StatusOK, editado)
 }
 
+type cuerpoCambiarPassword struct {
+	Password string `json:"password"`
+}
+
+// cambiarPasswordUsuarioHandler permite al dueño cambiar la contraseña de un usuario de su negocio.
+// PUT /api/usuarios/{id_usuario}/password
+func cambiarPasswordUsuarioHandler(w http.ResponseWriter, r *http.Request) {
+	if rolDe(r) != "dueño" {
+		responderError(w, http.StatusForbidden, "solo el dueño puede cambiar contraseñas")
+		return
+	}
+
+	idUsuario, err := strconv.Atoi(r.PathValue("id_usuario"))
+	if err != nil {
+		responderError(w, http.StatusBadRequest, "id de usuario inválido")
+		return
+	}
+
+	var cuerpo cuerpoCambiarPassword
+	if err := json.NewDecoder(r.Body).Decode(&cuerpo); err != nil {
+		responderError(w, http.StatusBadRequest, "cuerpo JSON inválido")
+		return
+	}
+	if len(cuerpo.Password) < 8 {
+		responderError(w, http.StatusBadRequest, "la contraseña debe tener al menos 8 caracteres")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(cuerpo.Password), bcrypt.DefaultCost)
+	if err != nil {
+		logger.Error("usuarios: error hasheando password: %v", err)
+		responderError(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+
+	resultado, err := db.DB.Exec(
+		`UPDATE usuarios SET password_hash = $1 WHERE id_usuario = $2 AND id_negocio = $3`,
+		string(hash), idUsuario, negocioDe(r),
+	)
+	if err != nil {
+		logger.Error("usuarios: error cambiando password usuario #%d: %v", idUsuario, err)
+		responderError(w, http.StatusInternalServerError, "no se pudo actualizar la contraseña")
+		return
+	}
+	filas, _ := resultado.RowsAffected()
+	if filas == 0 {
+		responderError(w, http.StatusNotFound, "usuario no encontrado")
+		return
+	}
+
+	responderJSON(w, http.StatusOK, map[string]string{"mensaje": "contraseña actualizada correctamente"})
+}
+
 // eliminarUsuarioHandler borra un usuario del negocio. Solo dueño.
-// No permite eliminarse a sí mismo (el negocio quedaría sin dueño).
-// DELETE /api/usuarios/{id_usuario}
 func eliminarUsuarioHandler(w http.ResponseWriter, r *http.Request) {
 	if rolDe(r) != "dueño" {
 		responderError(w, http.StatusForbidden, "solo el dueño puede eliminar usuarios")

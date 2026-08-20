@@ -3,18 +3,16 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
 const ACCESS_TOKEN_TTL_SEC = 15 * 60;
-const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, matches esquema.sql
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 interface TokenClaims {
   id_usuario: number;
   id_negocio: number;
   nombre: string;
   rol: string;
+  permisos?: any;
 }
 
-// Shared with stock-operations via HS256 for backward compatibility, though
-// stock-operations now validates sessions through /internal/session instead
-// of verifying the signature itself.
 export function jwtSecret(): string {
   return env('JWT_SECRET', 'secreto_solo_para_desarrollo');
 }
@@ -25,7 +23,13 @@ export function hashToken(token: string): string {
 
 export function signAccessToken(claims: TokenClaims): string {
   return jwt.sign(
-    { sub: claims.id_usuario, negocio: claims.id_negocio, nombre: claims.nombre, rol: claims.rol },
+    {
+      sub: claims.id_usuario,
+      negocio: claims.id_negocio,
+      nombre: claims.nombre,
+      rol: claims.rol,
+      permisos: claims.permisos ?? ['vender', 'stock'],
+    },
     jwtSecret(),
     { algorithm: 'HS256', expiresIn: ACCESS_TOKEN_TTL_SEC },
   );

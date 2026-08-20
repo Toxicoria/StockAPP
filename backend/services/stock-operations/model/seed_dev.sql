@@ -19,7 +19,7 @@ SELECT n.id_negocio, 'Dueño Demo', 'duenio@dev.local',
        'dueño'
   FROM negocios n
  WHERE n.nombre_negocio = 'Negocio Demo'
-ON CONFLICT (email) DO NOTHING;
+   AND NOT EXISTS (SELECT 1 FROM usuarios u WHERE u.id_negocio = n.id_negocio AND LOWER(u.nombre) = LOWER('Dueño Demo'));
 
 -- Cajero (empleado del dueño, solo caja y consulta)
 INSERT INTO usuarios (id_negocio, nombre, email, password_hash, rol)
@@ -28,7 +28,7 @@ SELECT n.id_negocio, 'Cajero Demo', 'cajero@dev.local',
        'cajero'
   FROM negocios n
  WHERE n.nombre_negocio = 'Negocio Demo'
-ON CONFLICT (email) DO NOTHING;
+   AND NOT EXISTS (SELECT 1 FROM usuarios u WHERE u.id_negocio = n.id_negocio AND LOWER(u.nombre) = LOWER('Cajero Demo'));
 
 -- Catálogo Maestro de Productos (EAN) para probar el autocompletado y el escáner
 INSERT INTO productos (id_producto, productos_ean, productos_descripcion, productos_cantidad_presentacion, productos_unidad_medida_presentacion, productos_marca)

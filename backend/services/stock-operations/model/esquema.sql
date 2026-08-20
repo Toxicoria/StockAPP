@@ -29,9 +29,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
     id_usuario SERIAL PRIMARY KEY,
     id_negocio INT NOT NULL,
     nombre VARCHAR(100) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
+    usuario VARCHAR(50),
+    email VARCHAR(150),
     password_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(50) DEFAULT 'cajero', -- 'dueño' o 'cajero'
+    permisos JSONB DEFAULT '["vender", "stock"]'::jsonb,
     fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_negocio) REFERENCES negocios(id_negocio) ON DELETE CASCADE
 );
@@ -135,4 +137,12 @@ ALTER TABLE negocios ADD COLUMN IF NOT EXISTS nombre_dueno   VARCHAR(150);
 ALTER TABLE negocios ADD COLUMN IF NOT EXISTS telefono       VARCHAR(50);
 ALTER TABLE negocios ADD COLUMN IF NOT EXISTS email_negocio  VARCHAR(150);
 
+-- Usuarios: email opcional, columna de usuario (sin espacios/caracteres especiales) y permisos
+ALTER TABLE usuarios ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_email_key;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS usuario VARCHAR(50);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos JSONB DEFAULT '["vender", "stock"]'::jsonb;
+
 CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha_hora);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_nombre ON usuarios (id_negocio, LOWER(nombre));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_username ON usuarios (id_negocio, LOWER(usuario));

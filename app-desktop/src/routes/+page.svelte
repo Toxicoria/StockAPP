@@ -1,6 +1,6 @@
 <script>
   import { goto } from '$app/navigation';
-  import { sesion, esDueno, haySesion, cerrarSesion } from '$lib/sesion.svelte.js';
+  import { sesion, esDueno, haySesion, tienePermiso, cerrarSesion } from '$lib/sesion.svelte.js';
   import { pedirApi } from '$lib/api.js';
   import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
   import {
@@ -13,11 +13,13 @@
 
   $effect(() => {
     if (!haySesion()) return;
-    pedirApi('/api/stock')
-      .then((/** @type {any[]} */ items) => {
-        alertas = items.filter((i) => i.stock_minimo > 0 && i.cantidad_disponible <= i.stock_minimo).length;
-      })
-      .catch(() => {});
+    if (tienePermiso('stock')) {
+      pedirApi('/api/stock')
+        .then((/** @type {any[]} */ items) => {
+          alertas = items.filter((i) => i.stock_minimo > 0 && i.cantidad_disponible <= i.stock_minimo).length;
+        })
+        .catch(() => {});
+    }
   });
 
   async function ejecutarCerrarSesion() {
@@ -26,7 +28,7 @@
     goto('/login');
   }
 
-  const rolEtiqueta = $derived(esDueno() ? 'Dueño/a · ve todo' : 'Empleado · caja y stock');
+  const rolEtiqueta = $derived(esDueno() ? 'Dueño/a · Ve todo' : 'Empleado · Acceso personalizado');
 </script>
 
 <div class="hub">
@@ -36,58 +38,74 @@
   </div>
 
   <div class="grilla">
-    <button class="accion destacada" onclick={() => goto('/vender')}>
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>
-      <span class="nombre">Vender</span>
-      <span class="text-muted detalle">Cobrar en el mostrador. Descuenta el stock solo.</span>
-    </button>
+    {#if tienePermiso('vender')}
+      <button class="accion destacada" onclick={() => goto('/vender')}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>
+        <span class="nombre">Vender</span>
+        <span class="text-muted detalle">Cobrar en el mostrador. Descuenta el stock solo.</span>
+      </button>
+    {/if}
 
-    <button class="accion" onclick={() => goto('/stock')}>
-      <span class="fila">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg>
-        {#if alertas > 0}<span class="tag tag-accent">{alertas} para reponer</span>{/if}
-      </span>
-      <span class="nombre">Stock</span>
-      <span class="text-muted detalle">Ver qué hay y cargar mercadería que llega.</span>
-    </button>
+    {#if tienePermiso('stock')}
+      <button class="accion" onclick={() => goto('/stock')}>
+        <span class="fila">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path></svg>
+          {#if alertas > 0}<span class="tag tag-accent">{alertas} para reponer</span>{/if}
+        </span>
+        <span class="nombre">Stock</span>
+        <span class="text-muted detalle">Ver qué hay y cargar mercadería que llega.</span>
+      </button>
+    {/if}
 
-    <button class="accion" onclick={() => goto('/ventas')}>
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M14 8H8"></path><path d="M16 12H8"></path><path d="M13 16H8"></path></svg>
-      <span class="nombre">Ventas</span>
-      <span class="text-muted detalle">La caja del día, venta por venta.</span>
-    </button>
+    {#if tienePermiso('ventas')}
+      <button class="accion" onclick={() => goto('/ventas')}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"></path><path d="M14 8H8"></path><path d="M16 12H8"></path><path d="M13 16H8"></path></svg>
+        <span class="nombre">Ventas</span>
+        <span class="text-muted detalle">La caja del día, venta por venta.</span>
+      </button>
+    {/if}
 
-    {#if esDueno()}
+    {#if tienePermiso('resumen')}
       <button class="accion" onclick={() => goto('/resumen')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
         <span class="nombre">Resumen</span>
-        <span class="text-muted detalle">Cómo viene el día y la semana. Solo dueño/a.</span>
+        <span class="text-muted detalle">Cómo viene el día y la semana.</span>
       </button>
+    {/if}
 
+    {#if tienePermiso('productos')}
       <button class="accion" onclick={() => goto('/productos')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
         <span class="nombre">Productos</span>
         <span class="text-muted detalle">Agregar productos y cambiar precios.</span>
       </button>
+    {/if}
 
+    {#if tienePermiso('precios')}
       <button class="accion" onclick={() => goto('/precios')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="5" y1="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
         <span class="nombre">Precios</span>
         <span class="text-muted detalle">Aplicar el aumento mensual de cada proveedor.</span>
       </button>
+    {/if}
 
+    {#if tienePermiso('facturas')}
       <button class="accion" onclick={() => goto('/facturas')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
         <span class="nombre">Facturación</span>
         <span class="text-muted detalle">Las facturas emitidas, todas juntas.</span>
       </button>
+    {/if}
 
+    {#if tienePermiso('usuarios')}
       <button class="accion" onclick={() => goto('/usuarios')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         <span class="nombre">Usuarios</span>
         <span class="text-muted detalle">Crear y gestionar empleados del negocio.</span>
       </button>
+    {/if}
 
+    {#if tienePermiso('configuracion')}
       <button class="accion" onclick={() => goto('/configuracion')}>
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
         <span class="nombre">Configuración</span>

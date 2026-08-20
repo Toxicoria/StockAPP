@@ -26,6 +26,7 @@ func Router() *http.ServeMux {
 	mux.HandleFunc("POST /api/proveedores/{id_proveedor}/aumento", conCORS(conAuth(aplicarAumentoHandler)))
 	mux.HandleFunc("POST /api/ventas", conCORS(conAuth(crearVentaHandler)))
 	mux.HandleFunc("GET /api/ventas", conCORS(conAuth(listarVentasHandler)))
+	mux.HandleFunc("GET /api/ventas/{id_venta}", conCORS(conAuth(obtenerVentaDetalleHandler)))
 	mux.HandleFunc("POST /api/ventas/{id_venta}/factura", conCORS(conAuth(facturarVentaHandler)))
 	mux.HandleFunc("GET /api/facturas", conCORS(conAuth(listarFacturasHandler)))
 	mux.HandleFunc("GET /api/negocio", conCORS(conAuth(negocioHandler)))
@@ -34,6 +35,7 @@ func Router() *http.ServeMux {
 	mux.HandleFunc("GET /api/usuarios", conCORS(conAuth(listarUsuariosHandler)))
 	mux.HandleFunc("POST /api/usuarios", conCORS(conAuth(crearUsuarioHandler)))
 	mux.HandleFunc("PUT /api/usuarios/{id_usuario}", conCORS(conAuth(editarUsuarioHandler)))
+	mux.HandleFunc("PUT /api/usuarios/{id_usuario}/password", conCORS(conAuth(cambiarPasswordUsuarioHandler)))
 	mux.HandleFunc("DELETE /api/usuarios/{id_usuario}", conCORS(conAuth(eliminarUsuarioHandler)))
 
 	// Preflight CORS: el mux con patrones "MÉTODO /ruta" respondería 405 a

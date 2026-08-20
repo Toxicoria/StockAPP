@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"stock-operations/db"
 	"stock-operations/pkg/logger"
@@ -217,3 +218,141 @@ func listarVentasHandler(w http.ResponseWriter, r *http.Request) {
 		"ventas":    ventas,
 	})
 }
+
+type itemVentaDetalle struct {
+	IDProducto     string  `json:"id_producto"`
+	Descripcion    string  `json:"descripcion"`
+	Marca          string  `json:"marca"`
+	Cantidad       float64 `json:"cantidad"`
+	PrecioUnitario float64 `json:"precio_unitario"`
+	Subtotal       float64 `json:"subtotal"`
+}
+
+type negocioInfoTicket struct {
+	Nombre     string  `json:"nombre"`
+	Direccion  *string `json:"direccion"`
+	CUIT       *string `json:"cuit"`
+	PuntoVenta string  `json:"punto_venta"`
+	Telefono   *string `json:"telefono"`
+}
+
+type ticketVentaDetalle struct {
+	IDVenta         int                `json:"id_venta"`
+	Fecha           string             `json:"fecha"`
+	Hora            string             `json:"hora"`
+	MetodoPago      string             `json:"metodo_pago"`
+	TotalVenta      float64            `json:"total_venta"`
+	Factura         *string            `json:"factura"`
+	TipoComprobante *int               `json:"tipo_comprobante"`
+	NroComprobante  *int               `json:"nro_comprobante"`
+	CAE             *string            `json:"cae"`
+	CAEVencimiento  *string            `json:"cae_vencimiento"`
+	Cajero          string             `json:"cajero"`
+	Negocio         negocioInfoTicket  `json:"negocio"`
+	Items           []itemVentaDetalle `json:"items"`
+}
+
+// obtenerVentaDetalleHandler devuelve la información completa de una venta y sus ítems.
+// GET /api/ventas/{id_venta}
+func obtenerVentaDetalleHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id_venta")
+	idVenta, err := strconv.Atoi(idStr)
+	if err != nil || idVenta <= 0 {
+		responderError(w, http.StatusBadRequest, "ID de venta inválido")
+		return
+	}
+
+	negocioID := negocioDe(r)
+
+	// 1. Obtener la venta, cajero y datos del negocio
+	var ticket ticketVentaDetalle
+	var fechaRaw, horaRaw string
+
+	err = db.DB.QueryRow(`
+		SELECT v.id_venta,
+		       to_char(v.fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE '`+zonaHoraria+`', 'DD/MM/YYYY'),
+		       to_char(v.fecha_hora AT TIME ZONE 'UTC' AT TIME ZONE '`+zonaHoraria+`', 'HH24:MI:SS'),
+		       v.metodo_pago,
+		       v.total_venta,
+		       v.factura,
+		       v.tipo_comprobante,
+		       v.nro_comprobante,
+		       v.cae,
+		       to_char(v.cae_vencimiento, 'DD/MM/YYYY'),
+		       COALESCE(u.nombre, 'Sistema'),
+		       n.nombre_negocio,
+		       n.direccion,
+		       n.cuit,
+		       COALESCE(n.punto_venta, '0001'),
+		       n.telefono
+		  FROM ventas v
+		  JOIN usuarios u ON u.id_usuario = v.id_usuario
+		  JOIN negocios n ON n.id_negocio = v.id_negocio
+		 WHERE v.id_venta = $1 AND v.id_negocio = $2
+	`, idVenta, negocioID).Scan(
+		&ticket.IDVenta,
+		&fechaRaw,
+		&horaRaw,
+		&ticket.MetodoPago,
+		&ticket.TotalVenta,
+		&ticket.Factura,
+		&ticket.TipoComprobante,
+		&ticket.NroComprobante,
+		&ticket.CAE,
+		&ticket.CAEVencimiento,
+		&ticket.Cajero,
+		&ticket.Negocio.Nombre,
+		&ticket.Negocio.Direccion,
+		&ticket.Negocio.CUIT,
+		&ticket.Negocio.PuntoVenta,
+		&ticket.Negocio.Telefono,
+	)
+
+	if err == sql.ErrNoRows {
+		responderError(w, http.StatusNotFound, "venta no encontrada")
+		return
+	}
+	if err != nil {
+		logger.Error("ventas: error obteniendo detalle de venta %d: %v", idVenta, err)
+		responderError(w, http.StatusInternalServerError, "error consultando la venta")
+		return
+	}
+
+	ticket.Fecha = fechaRaw
+	ticket.Hora = horaRaw
+
+	// 2. Obtener los renglones (detalles)
+	filas, err := db.DB.Query(`
+		SELECT d.id_producto,
+		       COALESCE(p.productos_descripcion, d.id_producto),
+		       COALESCE(p.productos_marca, ''),
+		       d.cantidad_llevada,
+		       d.precio_unitario_cobrado,
+		       d.subtotal
+		  FROM detalles_venta d
+		  LEFT JOIN productos p ON p.id_producto = d.id_producto
+		 WHERE d.id_venta = $1
+		 ORDER BY d.id_detalle ASC
+	`, idVenta)
+	if err != nil {
+		logger.Error("ventas: error consultando renglones de venta %d: %v", idVenta, err)
+		responderError(w, http.StatusInternalServerError, "error consultando los detalles de la venta")
+		return
+	}
+	defer filas.Close()
+
+	items := []itemVentaDetalle{}
+	for filas.Next() {
+		var it itemVentaDetalle
+		if err := filas.Scan(&it.IDProducto, &it.Descripcion, &it.Marca, &it.Cantidad, &it.PrecioUnitario, &it.Subtotal); err != nil {
+			logger.Error("ventas: error leyendo renglón de venta %d: %v", idVenta, err)
+			responderError(w, http.StatusInternalServerError, "error leyendo detalles de la venta")
+			return
+		}
+		items = append(items, it)
+	}
+	ticket.Items = items
+
+	responderJSON(w, http.StatusOK, ticket)
+}
+
