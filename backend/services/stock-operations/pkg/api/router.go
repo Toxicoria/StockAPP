@@ -40,10 +40,10 @@ func Router() *http.ServeMux {
 
 	// Rutas de administración global (front-admin)
 	mux.HandleFunc("POST /api/admin/login", conCORS(adminLoginHandler))
-	mux.HandleFunc("GET /api/admin/negocios", conCORS(adminListarNegociosHandler))
-	mux.HandleFunc("POST /api/admin/negocios", conCORS(adminCrearNegocioClienteHandler))
-	mux.HandleFunc("PUT /api/admin/negocios/{id_negocio}", conCORS(adminEditarNegocioHandler))
-	mux.HandleFunc("PUT /api/admin/usuarios/{id_usuario}/password", conCORS(adminCambiarPasswordHandler))
+	mux.HandleFunc("GET /api/admin/negocios", conCORS(conAuthAdmin(adminListarNegociosHandler)))
+	mux.HandleFunc("POST /api/admin/negocios", conCORS(conAuthAdmin(adminCrearNegocioClienteHandler)))
+	mux.HandleFunc("PUT /api/admin/negocios/{id_negocio}", conCORS(conAuthAdmin(adminEditarNegocioHandler)))
+	mux.HandleFunc("PUT /api/admin/usuarios/{id_usuario}/password", conCORS(conAuthAdmin(adminCambiarPasswordHandler)))
 
 	// Preflight CORS: el mux con patrones "MÉTODO /ruta" respondería 405 a
 	// OPTIONS si no hubiera un catch-all; conCORS corta con 204.

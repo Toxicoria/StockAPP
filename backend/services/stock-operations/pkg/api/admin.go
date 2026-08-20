@@ -1,10 +1,13 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"stock-operations/db"
 	"stock-operations/pkg/logger"
@@ -39,6 +42,24 @@ type respAdminLogin struct {
 	Usuario string `json:"usuario"`
 	Nombre  string `json:"nombre"`
 	Email   string `json:"email"`
+	Token   string `json:"token"`
+}
+
+var adminTokens sync.Map
+
+func conAuthAdmin(siguiente http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, hay := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !hay {
+			responderError(w, http.StatusUnauthorized, "falta token")
+			return
+		}
+		if _, ok := adminTokens.Load(token); !ok {
+			responderError(w, http.StatusUnauthorized, "token inválido")
+			return
+		}
+		siguiente(w, r)
+	}
 }
 
 // adminLoginHandler autentica credenciales de SuperAdmin contra la tabla super_admins.
@@ -78,11 +99,21 @@ func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		logger.Error("admin: error generando token: %v", err)
+		responderError(w, http.StatusInternalServerError, "error interno")
+		return
+	}
+	token := hex.EncodeToString(b)
+	adminTokens.Store(token, true)
+
 	responderJSON(w, http.StatusOK, respAdminLogin{
 		IDAdmin: idAdmin,
 		Usuario: usuarioDB,
 		Nombre:  nombreDB,
 		Email:   emailDB,
+		Token:   token,
 	})
 }
 

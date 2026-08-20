@@ -1,14 +1,26 @@
+import { obtenerSesionAdmin } from './auth';
 import type { NegocioAdmin, CrearNegocioPayload } from '../types/negocio';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 async function pedirApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const sesion = obtenerSesionAdmin();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (sesion && sesion.token) {
+    headers['Authorization'] = `Bearer ${sesion.token}`;
+  }
+
+  // Si hay headers en options, los mergeamos, asegurando que sean un objeto simple
+  if (options.headers) {
+    Object.assign(headers, options.headers);
+  }
+
   const res = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
   const datos = await res.json();
@@ -24,6 +36,7 @@ export async function loginSuperAdmin(usuario: string, password: string): Promis
   usuario: string;
   nombre: string;
   email: string;
+  token: string;
 }> {
   return pedirApi('/api/admin/login', {
     method: 'POST',
