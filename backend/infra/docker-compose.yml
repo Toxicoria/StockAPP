@@ -54,5 +54,18 @@ services:
       GO_INTERNO: http://api_go:8080
       PUERTO: "3000"
 
+  # front-admin (Panel Web en Vue 3 + TS)
+  front_admin:
+    build:
+      context: ../../front-admin
+    container_name: admin_sistema_stock
+    restart: unless-stopped
+    depends_on:
+      - api_ts
+    ports:
+      - "5173:80"
+    environment:
+      VITE_API_URL: http://localhost:3000
+
 volumes:
   pg_data_dev:

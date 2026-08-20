@@ -55,6 +55,15 @@ body {
   font-family: var(--font-body);
   font-size: 14px;
   color: var(--color-text);
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+input, textarea, [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -170,6 +179,18 @@ input[type='number']::-webkit-inner-spin-button { opacity: 1; }
   outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
   outline-offset: 0;
   border-color: var(--color-accent);
+}
+
+.input-error,
+.input.input-error {
+  border-color: var(--color-peligro, #a8443c) !important;
+  background-color: color-mix(in srgb, var(--color-peligro, #a8443c) 4%, #ffffff);
+}
+
+.input-error:focus,
+.input.input-error:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-peligro, #a8443c) 45%, transparent) !important;
+  border-color: var(--color-peligro, #a8443c) !important;
 }
 
 .input::placeholder { color: color-mix(in srgb, var(--color-text) 42%, transparent); }

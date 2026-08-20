@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { goto } from '$app/navigation';
+  import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
   import {
     iniciarSesion,
     haySesion,
@@ -20,6 +21,14 @@
   /** @type {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean } | null} */
   let usuarioSeleccionado = $state(null);
   let modoManual = $state(false);
+
+  // Carrusel para cuando hay más de 3 usuarios
+  let indiceCarrusel = $state(0);
+
+  // Modal de confirmación para eliminar usuario
+  /** @type {{ email: string, nombre: string } | null} */
+  let usuarioAEliminar = $state(null);
+  let modalEliminarAbierto = $state(false);
 
   /** @type {HTMLInputElement | null} */
   let inputPassword = $state(null);
@@ -61,6 +70,21 @@
     if (haySesion()) goto('/');
   });
 
+  const usuariosVisibles = $derived(
+    recientes.length <= 3 ? recientes : recientes.slice(indiceCarrusel, indiceCarrusel + 3)
+  );
+
+  const puedeAvanzarCarrusel = $derived(recientes.length > 3 && indiceCarrusel + 3 < recientes.length);
+  const puedeRetrocederCarrusel = $derived(recientes.length > 3 && indiceCarrusel > 0);
+
+  function avanzarCarrusel() {
+    if (puedeAvanzarCarrusel) indiceCarrusel += 1;
+  }
+
+  function retrocederCarrusel() {
+    if (puedeRetrocederCarrusel) indiceCarrusel -= 1;
+  }
+
   /** @param {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean }} u */
   async function seleccionarUsuario(u) {
     usuarioSeleccionado = u;
@@ -98,20 +122,41 @@
 
   /**
    * @param {MouseEvent} ev
-   * @param {string} emailAEliminar
+   * @param {{ email: string, nombre: string }} u
    */
-  function quitarUsuario(ev, emailAEliminar) {
+  function solicitarQuitarUsuario(ev, u) {
     ev.stopPropagation();
-    eliminarUsuarioReciente(emailAEliminar);
+    usuarioAEliminar = u;
+    modalEliminarAbierto = true;
+  }
+
+  function confirmarQuitarUsuario() {
+    if (!usuarioAEliminar) return;
+    const emailBorrar = usuarioAEliminar.email;
+    eliminarUsuarioReciente(emailBorrar);
     recientes = obtenerUsuariosRecientes();
-    if (usuarioSeleccionado?.email === emailAEliminar) {
+
+    // Reajustar índice del carrusel si sobrepasa la longitud actual
+    if (indiceCarrusel > 0 && indiceCarrusel >= recientes.length - 2) {
+      indiceCarrusel = Math.max(0, recientes.length - 3);
+    }
+
+    if (usuarioSeleccionado?.email === emailBorrar) {
       if (recientes.length > 0) {
-        seleccionarUsuario(recientes[0]);
+        const siguiente = recientes[Math.min(indiceCarrusel, recientes.length - 1)];
+        seleccionarUsuario(siguiente);
       } else {
         usuarioSeleccionado = null;
         modoManual = true;
       }
     }
+    modalEliminarAbierto = false;
+    usuarioAEliminar = null;
+  }
+
+  function cancelarQuitarUsuario() {
+    modalEliminarAbierto = false;
+    usuarioAEliminar = null;
   }
 
   /**
@@ -148,7 +193,7 @@
 <div class="centro">
   <div class="card elev-sm tarjeta">
     <div class="cabecera">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
       <h2>Control de stock</h2>
       <p class="text-muted">
         {#if !modoManual && recientes.length > 0}
@@ -164,34 +209,66 @@
         <!-- MODO SELECTOR DE USUARIOS RECIENTES -->
         <div class="vista-login" in:fly={{ y: 8, duration: 220, delay: 90 }} out:fade={{ duration: 120 }}>
           <div class="selector-cuentas">
-            <div class="grilla-usuarios">
-              {#each recientes as u (u.email)}
-                <div
-                  class="tarjeta-usuario {usuarioSeleccionado?.email === u.email ? 'activa' : ''}"
-                  role="button"
-                  tabindex="0"
-                  onclick={() => seleccionarUsuario(u)}
-                  onkeydown={(e) => e.key === 'Enter' && seleccionarUsuario(u)}
+            <div class="contenedor-carrusel">
+              {#if recientes.length > 3}
+                <button
+                  type="button"
+                  class="btn-carrusel-flecha"
+                  onclick={retrocederCarrusel}
+                  disabled={!puedeRetrocederCarrusel}
+                  title="Usuarios anteriores"
                 >
-                  <button
-                    type="button"
-                    class="btn-quitar"
-                    title="Olvidar usuario en este equipo"
-                    onclick={(e) => quitarUsuario(e, u.email)}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+              {/if}
+
+              <div class="grilla-usuarios">
+                {#each usuariosVisibles as u (u.email)}
+                  <div
+                    class="tarjeta-usuario {usuarioSeleccionado?.email === u.email ? 'activa' : ''}"
+                    role="button"
+                    tabindex="0"
+                    onclick={() => seleccionarUsuario(u)}
+                    onkeydown={(e) => e.key === 'Enter' && seleccionarUsuario(u)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                  </button>
+                    <button
+                      type="button"
+                      class="btn-quitar"
+                      title="Olvidar usuario en este equipo"
+                      onclick={(e) => solicitarQuitarUsuario(e, u)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
 
-                  <div class="avatar" style="background: {obtenerColorArcoiris(u.email || u.nombre)}">
-                    {obtenerIniciales(u.nombre, u.email)}
-                  </div>
+                    <div class="avatar" style="background: {obtenerColorArcoiris(u.email || u.nombre)}">
+                      {obtenerIniciales(u.nombre, u.email)}
+                    </div>
 
-                  <div class="info-usuario">
-                    <span class="nombre-usuario" title={u.nombre}>{u.nombre}</span>
+                    <div class="info-usuario">
+                      <span class="nombre-usuario" title={u.nombre}>{u.nombre}</span>
+                    </div>
                   </div>
-                </div>
-              {/each}
+                {/each}
+              </div>
+
+              {#if recientes.length > 3}
+                <button
+                  type="button"
+                  class="btn-carrusel-flecha"
+                  onclick={avanzarCarrusel}
+                  disabled={!puedeAvanzarCarrusel}
+                  title="Usuarios siguientes"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              {/if}
             </div>
+
+            {#if recientes.length > 3}
+              <div class="puntos-carrusel">
+                <span class="text-muted c-indicador">{indiceCarrusel + 1} - {Math.min(indiceCarrusel + 3, recientes.length)} de {recientes.length}</span>
+              </div>
+            {/if}
           </div>
 
           <form onsubmit={entrar} class="form-login">
@@ -200,9 +277,10 @@
               <input
                 id="password"
                 bind:this={inputPassword}
-                class="input"
+                class="input {error ? 'input-error' : ''}"
                 type="password"
                 bind:value={password}
+                oninput={() => (error = '')}
                 autocomplete="current-password"
                 placeholder="Ingresá tu contraseña"
                 required
@@ -234,11 +312,11 @@
           <form onsubmit={entrar} class="form-login">
             <div class="field">
               <label for="email">Usuario o Email</label>
-              <input id="email" class="input" type="text" bind:value={email} autocomplete="username" placeholder="Nombre de usuario o email" required />
+              <input id="email" class="input {error ? 'input-error' : ''}" type="text" bind:value={email} oninput={() => (error = '')} autocomplete="username" placeholder="Nombre de usuario o email" required />
             </div>
             <div class="field">
               <label for="password">Contraseña</label>
-              <input id="password" class="input" type="password" bind:value={password} autocomplete="current-password" placeholder="••••••••" required />
+              <input id="password" class="input {error ? 'input-error' : ''}" type="password" bind:value={password} oninput={() => (error = '')} autocomplete="current-password" placeholder="••••••••" required />
             </div>
 
             <label class="checkbox-label">
@@ -267,22 +345,36 @@
   </div>
 </div>
 
+<ModalConfirmacion
+  abierto={modalEliminarAbierto}
+  titulo="¿Quitar usuario recordado?"
+  mensaje={usuarioAEliminar ? `¿Querés quitar a "${usuarioAEliminar.nombre}" de los accesos rápidos en este equipo?` : ''}
+  textoConfirmar="Sí, quitar"
+  textoCancelar="Cancelar"
+  variante="peligro"
+  onconfirmar={confirmarQuitarUsuario}
+  oncancelar={cancelarQuitarUsuario}
+/>
+
 <style>
   .centro {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100%;
+    min-height: calc(100vh - 120px);
+    width: 100%;
     padding: var(--space-4);
   }
   .tarjeta {
-    width: min(440px, 100%);
+    width: min(470px, 100%);
     min-height: 480px;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    padding: var(--space-6);
-    transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 32px 28px;
+    margin: auto;
+    background: #ffffff;
+    box-shadow: var(--shadow-md);
   }
   .cabecera {
     text-align: center;
@@ -311,27 +403,43 @@
   .selector-cuentas {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: 8px;
+    align-items: center;
+    width: 100%;
   }
+
+  .contenedor-carrusel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
   .grilla-usuarios {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: var(--space-3);
-    max-height: 240px;
-    overflow-y: auto;
-    padding: 2px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    width: 100%;
   }
+
   .tarjeta-usuario {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-4) var(--space-2);
-    border-radius: var(--radius-md, 8px);
-    border: 2px solid var(--color-border, #e2e8f0);
+    justify-content: center;
+    width: 105px;
+    height: 115px;
+    padding: 12px 8px 10px;
+    border-radius: var(--radius-lg, 12px);
+    border: 2px solid var(--color-divider);
     background: var(--color-bg-card, #ffffff);
     cursor: pointer;
     transition: all 0.15s ease-in-out;
+    flex-shrink: 0;
   }
   .tarjeta-usuario:hover {
     border-color: var(--color-accent-400, #429398);
@@ -348,9 +456,8 @@
     position: absolute;
     top: 4px;
     right: 4px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
+    width: 24px;
+    height: 24px;
     border: none;
     background: transparent;
     color: var(--color-text-muted, #718096);
@@ -358,26 +465,62 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    opacity: 0.6;
-    transition: opacity 0.15s, background 0.15s;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    z-index: 2;
   }
   .tarjeta-usuario:hover .btn-quitar {
     opacity: 1;
+    visibility: visible;
+    color: var(--color-peligro, #e53e3e);
   }
   .btn-quitar:hover {
-    background: rgba(229, 62, 62, 0.15);
-    color: var(--color-peligro, #e53e3e);
+    color: #c53030;
+    transform: scale(1.2);
+  }
+
+  .btn-carrusel-flecha {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--color-divider);
+    background: #ffffff;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+  .btn-carrusel-flecha:hover:not(:disabled) {
+    border-color: var(--color-accent-600);
+    background: var(--color-accent-50, #f0f7f7);
+    color: var(--color-accent-700);
+  }
+  .btn-carrusel-flecha:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .puntos-carrusel {
+    text-align: center;
+    font-size: 11px;
+  }
+  .c-indicador {
+    font-weight: 500;
   }
 
   .avatar {
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 17px;
+    font-size: 16px;
     color: #ffffff;
     margin-bottom: var(--space-2);
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
@@ -391,7 +534,7 @@
     text-align: center;
   }
   .nombre-usuario {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--color-text-heading, #2d3748);
     max-width: 100%;

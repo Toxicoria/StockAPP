@@ -1,11 +1,9 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Primero solo las dependencias: esta capa se cachea mientras no cambie package.json
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+COPY package*.json ./
+RUN npm install
 
-# Después el código
 COPY tsconfig.json ./
 COPY src/ src/
 RUN npm run build
@@ -13,7 +11,9 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+COPY package*.json ./
+RUN npm install --omit=dev
 COPY --from=builder /app/dist dist/
+
+EXPOSE 3000
 CMD ["node", "dist/index.js"]

@@ -1,18 +1,17 @@
-name: Backend CI (Go)
+name: StockAPP CI / CD Pipeline
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'backend/**'
-      - 'cliente-sidecar/**'
+      - 'feat/**'
   pull_request:
     branches:
       - main
 
 jobs:
-  construir-y-probar:
+  verificar-servicios:
+    name: Verificar Servicios y Frontend Admin
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Clonar el repositorio
@@ -48,3 +47,40 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run check
+
+      - name: 🖥️ Verificar front-admin (Vue 3 + TypeScript)
+        working-directory: ./front-admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+  verificar-contenedores:
+    name: Verificar Construcción de Contenedores Docker/Podman
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Clonar el repositorio
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🐳 Build Imagen stock-operations (Go)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/services/stock-operations
+          push: false
+          tags: stock-operations:test
+
+      - name: 🐳 Build Imagen stock-api (Gateway Node)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/services/stock-api
+          push: false
+          tags: stock-api:test
+
+      - name: 🐳 Build Imagen front-admin (Vue 3 + Nginx)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./front-admin
+          push: false
+          tags: front-admin:test

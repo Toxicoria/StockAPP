@@ -1,4 +1,4 @@
-# Node.js & Frontend (SvelteKit / Vite)
+# Node.js, Vite & Frontends (app-desktop, front-admin, stock-api)
 **/node_modules/
 **/.svelte-kit/
 **/.vite/
@@ -9,11 +9,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Rust & Tauri
+# Rust & Tauri (app-desktop)
 **/target/
 **/src-tauri/gen/
 
-# Go
+# Go (stock-operations, cliente-sidecar)
 *.exe
 *.exe~
 *.dll
@@ -35,16 +35,18 @@ backend/services/stock-operations/stock-operations
 cliente-sidecar/cliente-sidecar
 bin/
 
-# Entorno y Secretos
+# Entorno y Secretos (Seguridad)
 .env
 .env.*
+!.env.example
 !app-desktop/.env.development
 process-compose.yaml
 cliente-sidecar/tsnet-state/
 **/tsnet-state/
 
-# Infraestructura y Archivos de datos masivos
+# Infraestructura y Archivos de datos
 infra/postgres_data/
+backend/infra/postgres_data/
 backend/services/stock-operations/lote_csv/
 
 # IDE, Editores y Sistema Operativo
@@ -61,7 +63,3 @@ Thumbs.db
 *.log
 *.tmp
 *.temp
-
-# Agentes y Documentación Markdown
-.agents/
-*.md

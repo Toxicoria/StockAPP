@@ -38,6 +38,13 @@ func Router() *http.ServeMux {
 	mux.HandleFunc("PUT /api/usuarios/{id_usuario}/password", conCORS(conAuth(cambiarPasswordUsuarioHandler)))
 	mux.HandleFunc("DELETE /api/usuarios/{id_usuario}", conCORS(conAuth(eliminarUsuarioHandler)))
 
+	// Rutas de administración global (front-admin)
+	mux.HandleFunc("POST /api/admin/login", conCORS(adminLoginHandler))
+	mux.HandleFunc("GET /api/admin/negocios", conCORS(adminListarNegociosHandler))
+	mux.HandleFunc("POST /api/admin/negocios", conCORS(adminCrearNegocioClienteHandler))
+	mux.HandleFunc("PUT /api/admin/negocios/{id_negocio}", conCORS(adminEditarNegocioHandler))
+	mux.HandleFunc("PUT /api/admin/usuarios/{id_usuario}/password", conCORS(adminCambiarPasswordHandler))
+
 	// Preflight CORS: el mux con patrones "MÉTODO /ruta" respondería 405 a
 	// OPTIONS si no hubiera un catch-all; conCORS corta con 204.
 	mux.HandleFunc("OPTIONS /api/", conCORS(func(w http.ResponseWriter, r *http.Request) {}))

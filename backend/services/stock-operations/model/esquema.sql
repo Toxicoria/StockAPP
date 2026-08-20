@@ -109,6 +109,18 @@ CREATE TABLE IF NOT EXISTS proveedores (
 );
 
 -- ==============================================================================
+-- 🔐 8. SUPER ADMINS (Administradores globales del sistema)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS super_admins (
+    id_admin SERIAL PRIMARY KEY,
+    usuario VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(150),
+    password_hash VARCHAR(255) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
 -- 🔧 8. MIGRACIONES (Idempotentes: corren también sobre bases existentes.
 --    El init de compose solo ejecuta este archivo con el volumen vacío;
 --    `task db:esquema` lo re-aplica sobre bases vivas sin destruir datos.)

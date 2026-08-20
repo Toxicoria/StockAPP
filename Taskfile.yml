@@ -9,10 +9,16 @@ env:
 tasks:
   # ---------- Infraestructura (Docker Compose) ----------
   infra:up:
-    desc: Levanta Postgres + Tailscale + API en Docker
+    desc: Levanta Postgres + API Go + Gateway TS + Front Admin en Contenedores
     dir: backend/infra
     cmds:
-      - docker compose up -d
+      - podman compose up -d || docker compose up -d
+
+  infra:build:
+    desc: Reconstruye las imágenes de todos los microservicios y frontends
+    dir: backend/infra
+    cmds:
+      - podman compose build || docker compose build
 
   infra:down:
     desc: Detiene los contenedores (los datos persisten en el volumen)
@@ -83,6 +89,12 @@ tasks:
     dir: app-desktop
     cmds:
       - npm run tauri dev
+
+  front-admin:run:
+    desc: Corre el panel de administración web (Vue 3 + TS)
+    dir: front-admin
+    cmds:
+      - npm run dev
 
   # ---------- Verificación (lo mismo que corre el CI) ----------
   ci:

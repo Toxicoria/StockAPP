@@ -12,6 +12,13 @@ INSERT INTO negocios (nombre_negocio, direccion, cuit)
 SELECT 'Negocio Demo', 'Calle Falsa 123', '20-00000000-0'
 WHERE NOT EXISTS (SELECT 1 FROM negocios WHERE nombre_negocio = 'Negocio Demo');
 
+-- SuperAdmin del Sistema (acceso exclusivo a front-admin: admin / admin123)
+INSERT INTO super_admins (usuario, email, password_hash, nombre)
+SELECT 'admin', 'admin@stockapp.local',
+       '$2a$10$g0roVPPbLD7UV60qVSnJnue2ICq5mbHxd638t84En5Au6a5cz/WSC', -- bcrypt("admin123")
+       'Administrador del Sistema'
+WHERE NOT EXISTS (SELECT 1 FROM super_admins WHERE usuario = 'admin');
+
 -- Dueño del negocio (cliente que usa la app, tiene todos los permisos)
 INSERT INTO usuarios (id_negocio, nombre, email, password_hash, rol)
 SELECT n.id_negocio, 'Dueño Demo', 'duenio@dev.local',

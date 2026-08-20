@@ -4,12 +4,19 @@ import { verifyAccessToken } from '../services/tokenService.js';
 import * as proxyService from '../services/proxyService.js';
 
 export async function forwardToStockOperations(req: Request, res: Response) {
-  const token = req.headers.authorization?.replace(/^Bearer /, '');
-  if (!token) throw new ApiError(401, 'missing Authorization: Bearer <token> header');
-  try {
-    verifyAccessToken(token);
-  } catch {
-    throw new ApiError(401, 'invalid or expired token');
+  const esRutaPublicaOAdmin =
+    req.originalUrl.startsWith('/api/admin') ||
+    req.originalUrl.startsWith('/api/registro') ||
+    req.originalUrl.startsWith('/api/ping');
+
+  if (!esRutaPublicaOAdmin) {
+    const token = req.headers.authorization?.replace(/^Bearer /, '');
+    if (!token) throw new ApiError(401, 'missing Authorization: Bearer <token> header');
+    try {
+      verifyAccessToken(token);
+    } catch {
+      throw new ApiError(401, 'invalid or expired token');
+    }
   }
 
   let upstream: globalThis.Response;
