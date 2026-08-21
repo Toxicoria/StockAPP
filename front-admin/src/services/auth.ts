@@ -3,6 +3,7 @@ export interface SuperAdminSesion {
   usuario: string;
   nombre: string;
   email: string;
+  token: string;
 }
 
 const STORAGE_KEY = 'stockapp_superadmin_sesion';
