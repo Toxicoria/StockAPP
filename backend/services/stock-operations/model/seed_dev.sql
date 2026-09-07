@@ -67,3 +67,9 @@ INSERT INTO stock_interno (id_negocio, id_producto, cantidad_disponible, precio_
 SELECT n.id_negocio, '7790001001010', 3.00, 1200.00, 6.00
   FROM negocios n WHERE n.nombre_negocio = 'Negocio Demo'
 ON CONFLICT (id_negocio, id_producto) DO NOTHING;
+
+-- Key por defecto para entorno de desarrollo
+UPDATE negocios
+   SET ts_auth_key = 'tskey-auth-dev-local-demo-key'
+ WHERE nombre_negocio = 'Negocio Demo' AND (ts_auth_key IS NULL OR ts_auth_key = '');
+

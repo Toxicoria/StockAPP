@@ -13,6 +13,7 @@ services:
     volumes:
       - pg_data_dev:/var/lib/postgresql/data
       - ../services/stock-operations/model/esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro,z
+      - ../services/stock-operations/model/seed_dev.sql:/docker-entrypoint-initdb.d/02_seed_dev.sql:ro,z
 
   # Servicio interno en Go (lógica de negocio)
   api_go:

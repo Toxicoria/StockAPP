@@ -155,6 +155,25 @@ ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_email_key;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS usuario VARCHAR(50);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos JSONB DEFAULT '["vender", "stock"]'::jsonb;
 
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS max_dispositivos INT NOT NULL DEFAULT 4;
+ALTER TABLE negocios ADD COLUMN IF NOT EXISTS ts_auth_key TEXT;
+
+-- ==============================================================================
+-- 📱 9. DISPOSITIVOS CLIENTE (Control de equipos P2P Tailscale por negocio — máx 4)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS dispositivos_cliente (
+    id_dispositivo SERIAL PRIMARY KEY,
+    id_negocio INT NOT NULL REFERENCES negocios(id_negocio) ON DELETE CASCADE,
+    device_id VARCHAR(100) NOT NULL,
+    nombre_dispositivo VARCHAR(100) NOT NULL,
+    tipo_dispositivo VARCHAR(20) DEFAULT 'desktop',
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultima_conexion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN DEFAULT TRUE,
+    UNIQUE (id_negocio, device_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha_hora);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_nombre ON usuarios (id_negocio, LOWER(nombre));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_username ON usuarios (id_negocio, LOWER(usuario));
+CREATE INDEX IF NOT EXISTS idx_dispositivos_negocio_activo ON dispositivos_cliente (id_negocio, activo);

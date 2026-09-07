@@ -1,4 +1,4 @@
-import type { NegocioAdmin, CrearNegocioPayload } from '../types/negocio';
+import type { NegocioAdmin, CrearNegocioPayload, DispositivoCliente } from '../types/negocio';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -67,10 +67,20 @@ export async function actualizarNegocio(
     usuario?: string;
     email_usuario?: string;
     password?: string;
-  }
+  },
 ): Promise<{ mensaje: string }> {
   return pedirApi(`/api/admin/negocios/${idNegocio}`, {
     method: 'PUT',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function obtenerDispositivosNegocio(idNegocio: number): Promise<DispositivoCliente[]> {
+  return pedirApi<DispositivoCliente[]>(`/api/auth/negocios/${idNegocio}/dispositivos`);
+}
+
+export async function desvincularDispositivo(idNegocio: number, idDispositivo: number): Promise<{ ok: boolean }> {
+  return pedirApi<{ ok: boolean }>(`/api/auth/negocios/${idNegocio}/dispositivos/${idDispositivo}`, {
+    method: 'DELETE',
   });
 }

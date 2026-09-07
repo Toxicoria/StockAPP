@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { ApiError } from '../errors/ApiError.js';
 import { hashToken, newRefreshToken, signAccessToken } from './tokenService.js';
+import { generarAuthKeyTailscale } from './tailscaleService.js';
 
 interface UserRow {
   id_usuario: number;
@@ -61,4 +62,103 @@ export async function refresh(refreshToken: string) {
 
 export async function logout(refreshToken: string) {
   await pool.query(`DELETE FROM refresh_tokens WHERE token_hash = $1`, [hashToken(refreshToken)]);
+}
+
+export async function obtenerTailscaleKey(
+  identificador: string,
+  password: string,
+  deviceId: string,
+  nombreDispositivo: string = 'Dispositivo Desktop',
+  tipoDispositivo: string = 'desktop',
+) {
+  const { rows } = await pool.query<
+    UserRow & { nombre_negocio: string; max_dispositivos: number; ts_auth_key: string }
+  >(
+    `SELECT u.id_usuario, u.id_negocio, u.nombre, u.password_hash, u.rol,
+            n.nombre_negocio, COALESCE(n.max_dispositivos, 4) as max_dispositivos, n.ts_auth_key
+       FROM usuarios u
+       JOIN negocios n ON n.id_negocio = u.id_negocio
+      WHERE LOWER(u.usuario) = LOWER($1) OR LOWER(u.email) = LOWER($1)`,
+    [identificador],
+  );
+
+  const user = rows[0];
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    throw new ApiError(401, 'Usuario o contraseña incorrectos');
+  }
+
+  // Si el negocio aún no tiene un ts_auth_key generado, se genera dinámicamente
+  let tsAuthKey = user.ts_auth_key;
+  if (!tsAuthKey) {
+    tsAuthKey = await generarAuthKeyTailscale(user.nombre_negocio);
+    await pool.query(`UPDATE negocios SET ts_auth_key = $1 WHERE id_negocio = $2`, [tsAuthKey, user.id_negocio]);
+  }
+
+  // Verificar el dispositivo en la tabla dispositivos_cliente
+  const devId = deviceId || `dev-${user.id_usuario}-${Date.now()}`;
+
+  const { rows: devRows } = await pool.query(
+    `SELECT id_dispositivo, activo FROM dispositivos_cliente WHERE id_negocio = $1 AND device_id = $2`,
+    [user.id_negocio, devId],
+  );
+
+  if (devRows.length > 0) {
+    const dev = devRows[0];
+    if (!dev.activo) {
+      throw new ApiError(403, 'Este dispositivo ha sido desvinculado por el administrador');
+    }
+    // Actualizar última conexión
+    await pool.query(
+      `UPDATE dispositivos_cliente SET ultima_conexion = CURRENT_TIMESTAMP, nombre_dispositivo = $1 WHERE id_dispositivo = $2`,
+      [nombreDispositivo, dev.id_dispositivo],
+    );
+  } else {
+    // Es un dispositivo nuevo: verificar cuántos hay activos
+    const { rows: countRows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM dispositivos_cliente WHERE id_negocio = $1 AND activo = true`,
+      [user.id_negocio],
+    );
+
+    const activeCount = parseInt(countRows[0]?.count || '0', 10);
+    if (activeCount >= user.max_dispositivos) {
+      throw new ApiError(
+        403,
+        `Límite de ${user.max_dispositivos} dispositivos alcanzado para este negocio. Desvincula un equipo desde el panel de administración para ingresar con uno nuevo.`,
+      );
+    }
+
+    // Registrar nuevo dispositivo
+    await pool.query(
+      `INSERT INTO dispositivos_cliente (id_negocio, device_id, nombre_dispositivo, tipo_dispositivo)
+       VALUES ($1, $2, $3, $4)`,
+      [user.id_negocio, devId, nombreDispositivo, tipoDispositivo],
+    );
+  }
+
+  return {
+    ok: true,
+    ts_auth_key: tsAuthKey,
+    destino_api: process.env.DESTINO_API || 'http://stock-server-api:3000',
+    negocio: user.nombre_negocio,
+    id_negocio: user.id_negocio,
+  };
+}
+
+export async function obtenerDispositivosNegocio(idNegocio: number) {
+  const { rows } = await pool.query(
+    `SELECT id_dispositivo, device_id, nombre_dispositivo, tipo_dispositivo, fecha_registro, ultima_conexion, activo
+       FROM dispositivos_cliente
+      WHERE id_negocio = $1
+      ORDER BY fecha_registro DESC`,
+    [idNegocio],
+  );
+  return rows;
+}
+
+export async function desvincularDispositivo(idNegocio: number, idDispositivo: number) {
+  await pool.query(`DELETE FROM dispositivos_cliente WHERE id_negocio = $1 AND id_dispositivo = $2`, [
+    idNegocio,
+    idDispositivo,
+  ]);
+  return { ok: true };
 }

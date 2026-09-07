@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { NegocioAdmin } from '../types/negocio';
-import { actualizarNegocio } from '../services/api';
+import type { NegocioAdmin, DispositivoCliente } from '../types/negocio';
+import { actualizarNegocio, obtenerDispositivosNegocio, desvincularDispositivo } from '../services/api';
 
 const props = defineProps<{
   abierto: boolean;
@@ -25,6 +25,31 @@ const form = ref({
   email_usuario: '',
   password: '',
 });
+
+const dispositivos = ref<DispositivoCliente[]>([]);
+const cargandoDispositivos = ref(false);
+
+async function cargarDispositivos() {
+  if (!props.negocio) return;
+  cargandoDispositivos.value = true;
+  try {
+    dispositivos.value = await obtenerDispositivosNegocio(props.negocio.id_negocio);
+  } catch (e) {
+    console.error('Error cargando dispositivos:', e);
+  } finally {
+    cargandoDispositivos.value = false;
+  }
+}
+
+async function eliminarDispositivo(idDispositivo: number) {
+  if (!props.negocio) return;
+  try {
+    await desvincularDispositivo(props.negocio.id_negocio, idDispositivo);
+    await cargarDispositivos();
+  } catch (e: any) {
+    alert(e.message || 'No se pudo desvincular el dispositivo');
+  }
+}
 
 const mostrandoConfirmacion = ref(false);
 const cargando = ref(false);
@@ -50,9 +75,10 @@ watch(
       mostrandoConfirmacion.value = false;
       error.value = '';
       exito.value = '';
+      cargarDispositivos();
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function generarPassword() {
@@ -229,6 +255,30 @@ async function guardarCambios() {
                   <button type="button" class="btn-generar" @click="generarPassword">🎲 Generar clave</button>
                 </div>
                 <input v-model="form.password" class="input" type="text" placeholder="Dejar en blanco para mantener la actual" />
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN 3: DISPOSITIVOS VINCULADOS (P2P Tailscale) -->
+          <div class="seccion-box">
+            <h4 class="seccion-tit">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-hover)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              Dispositivos Vinculados ({{ dispositivos.length }}/{{ negocio.max_dispositivos || 4 }})
+            </h4>
+            <p class="desc-muted" style="font-size: 12.5px; margin-bottom: 10px;">
+              Equipos autorizados a conectarse al búnker. Puedes desvincular un equipo para liberar un cupo si el cliente cambia de PC o celular.
+            </p>
+            <div v-if="cargandoDispositivos" class="desc-muted">Cargando dispositivos...</div>
+            <div v-else-if="dispositivos.length === 0" class="desc-muted">No hay dispositivos registrados aún para este negocio.</div>
+            <div v-else class="lista-dispositivos">
+              <div v-for="dev in dispositivos" :key="dev.id_dispositivo" class="item-dispositivo">
+                <div class="info-dev">
+                  <span class="nombre-dev">💻 {{ dev.nombre_dispositivo }}</span>
+                  <span class="meta-dev">ID: {{ dev.device_id }} · Registrado: {{ dev.fecha_registro?.substring(0, 10) || 'Hoy' }}</span>
+                </div>
+                <button type="button" class="btn-desvincular" @click="eliminarDispositivo(dev.id_dispositivo)">
+                  🗑️ Desvincular
+                </button>
               </div>
             </div>
           </div>
@@ -433,4 +483,54 @@ async function guardarCambios() {
   font-size: 13px;
   font-weight: 600;
 }
+
+.lista-dispositivos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-dispositivo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.info-dev {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nombre-dev {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.meta-dev {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.btn-desvincular {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-desvincular:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
 </style>
+

@@ -13,13 +13,14 @@ const emit = defineEmits<{
 
 const nombreNegocio = ref('');
 const usuario = ref('');
+const email = ref('');
 const password = ref('');
 const nombreDueno = ref('');
 
 const cargando = ref(false);
 const error = ref('');
 const copiado = ref(false);
-const negocioCreadoExito = ref<{ usuario: string; password: string; nombre_negocio: string } | null>(null);
+const negocioCreadoExito = ref<{ usuario: string; email?: string; password: string; nombre_negocio: string } | null>(null);
 
 function generarPassword() {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -45,8 +46,12 @@ function sugerirUsuario() {
 
 async function guardar() {
   error.value = '';
-  if (!usuario.value.trim() || !password.value.trim()) {
-    error.value = 'El usuario y la contraseña son obligatorios';
+  if (!usuario.value.trim() && !email.value.trim()) {
+    error.value = 'El nombre de usuario o correo electrónico es obligatorio';
+    return;
+  }
+  if (!password.value.trim()) {
+    error.value = 'La contraseña es obligatoria';
     return;
   }
 
@@ -55,6 +60,7 @@ async function guardar() {
     const res = await crearNegocioCliente({
       nombre_negocio: nombreNegocio.value.trim(),
       usuario: usuario.value.trim(),
+      email: email.value.trim(),
       password: password.value.trim(),
       nombre_dueno: nombreDueno.value.trim(),
     });
@@ -62,6 +68,7 @@ async function guardar() {
     negocioCreadoExito.value = {
       nombre_negocio: res.nombre_negocio,
       usuario: res.usuario,
+      email: email.value.trim(),
       password: password.value.trim(),
     };
     emit('creado');
@@ -90,6 +97,7 @@ Descargá la app e ingresá para completar tu perfil.`;
 function cerrarModal() {
   nombreNegocio.value = '';
   usuario.value = '';
+  email.value = '';
   password.value = '';
   nombreDueno.value = '';
   error.value = '';
@@ -109,7 +117,7 @@ function cerrarModal() {
       <!-- VISTA 1: FORMULARIO DE CREACIÓN -->
       <div v-if="!negocioCreadoExito" class="modal-body">
         <p class="desc-muted">
-          Creá el usuario y contraseña inicial para tu cliente. El cliente luego completará sus datos comerciales desde la app.
+          Creá las credenciales de acceso para tu cliente. Se generará automáticamente su Auth Key de Tailscale (máx 4 dispositivos).
         </p>
 
         <form @submit.prevent="guardar" class="form-grid">
@@ -122,6 +130,11 @@ function cerrarModal() {
               placeholder="Ej: Kiosco Central"
               @blur="sugerirUsuario"
             />
+          </div>
+
+          <div class="field">
+            <label>Correo Electrónico (Para verificación de cliente)</label>
+            <input v-model="email" class="input" type="email" placeholder="Ej: cliente@ejemplo.com" />
           </div>
 
           <div class="field">

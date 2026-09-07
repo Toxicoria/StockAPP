@@ -146,11 +146,12 @@ func adminListarNegociosHandler(w http.ResponseWriter, r *http.Request) {
 type cuerpoAdminCrearNegocio struct {
 	NombreNegocio string `json:"nombre_negocio"`
 	Usuario       string `json:"usuario"`
+	Email         string `json:"email"`
 	Password      string `json:"password"`
 	NombreDueno   string `json:"nombre_dueno"`
 }
 
-// adminCrearNegocioClienteHandler crea un nuevo negocio y su usuario dueño con datos mínimos (usuario + contraseña).
+// adminCrearNegocioClienteHandler crea un nuevo negocio y su usuario dueño con datos mínimos (usuario + contraseña + email).
 // POST /api/admin/negocios
 func adminCrearNegocioClienteHandler(w http.ResponseWriter, r *http.Request) {
 	var cuerpo cuerpoAdminCrearNegocio
@@ -160,12 +161,16 @@ func adminCrearNegocioClienteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cuerpo.Usuario = strings.TrimSpace(cuerpo.Usuario)
+	cuerpo.Email = strings.TrimSpace(cuerpo.Email)
 	cuerpo.NombreNegocio = strings.TrimSpace(cuerpo.NombreNegocio)
 	cuerpo.NombreDueno = strings.TrimSpace(cuerpo.NombreDueno)
 
-	if cuerpo.Usuario == "" || cuerpo.Password == "" {
-		responderError(w, http.StatusBadRequest, "el usuario y la contraseña son obligatorios")
+	if (cuerpo.Usuario == "" && cuerpo.Email == "") || cuerpo.Password == "" {
+		responderError(w, http.StatusBadRequest, "el usuario/email y la contraseña son obligatorios")
 		return
+	}
+	if cuerpo.Usuario == "" {
+		cuerpo.Usuario = strings.Split(cuerpo.Email, "@")[0]
 	}
 	if len(cuerpo.Password) < 4 {
 		responderError(w, http.StatusBadRequest, "la contraseña debe tener al menos 4 caracteres")
@@ -196,10 +201,10 @@ func adminCrearNegocioClienteHandler(w http.ResponseWriter, r *http.Request) {
 
 	var idNegocio int
 	err = tx.QueryRow(`
-		INSERT INTO negocios (nombre_negocio, nombre_dueno)
-		VALUES ($1, $2)
+		INSERT INTO negocios (nombre_negocio, nombre_dueno, email_negocio)
+		VALUES ($1, $2, NULLIF($3, ''))
 		RETURNING id_negocio
-	`, cuerpo.NombreNegocio, cuerpo.NombreDueno).Scan(&idNegocio)
+	`, cuerpo.NombreNegocio, cuerpo.NombreDueno, cuerpo.Email).Scan(&idNegocio)
 	if err != nil {
 		logger.Error("admin: error creando negocio: %v", err)
 		responderError(w, http.StatusInternalServerError, "no se pudo crear el negocio")
@@ -210,13 +215,13 @@ func adminCrearNegocioClienteHandler(w http.ResponseWriter, r *http.Request) {
 	permisosCompleto := `["vender", "stock", "ventas", "resumen", "productos", "precios", "facturas", "usuarios", "configuracion"]`
 
 	err = tx.QueryRow(`
-		INSERT INTO usuarios (id_negocio, nombre, usuario, password_hash, rol, permisos)
-		VALUES ($1, $2, $3, $4, 'dueño', $5::jsonb)
+		INSERT INTO usuarios (id_negocio, nombre, usuario, email, password_hash, rol, permisos)
+		VALUES ($1, $2, $3, NULLIF($4, ''), $5, 'dueño', $6::jsonb)
 		RETURNING id_usuario
-	`, idNegocio, cuerpo.NombreDueno, cuerpo.Usuario, string(hash), permisosCompleto).Scan(&idUsuario)
+	`, idNegocio, cuerpo.NombreDueno, cuerpo.Usuario, cuerpo.Email, string(hash), permisosCompleto).Scan(&idUsuario)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
-			responderError(w, http.StatusConflict, "el nombre de usuario ya está registrado en este o en otro negocio")
+			responderError(w, http.StatusConflict, "el nombre de usuario o correo ya está registrado")
 			return
 		}
 		logger.Error("admin: error creando usuario dueño: %v", err)
