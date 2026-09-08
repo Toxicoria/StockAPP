@@ -132,6 +132,37 @@ func conAuth(siguiente http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// conSuperAdminAuth exige un access token válido perteneciente a un usuario con rol 'superadmin'.
+func conSuperAdminAuth(siguiente http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		crudo, hayToken := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !hayToken {
+			responderError(w, http.StatusUnauthorized, "falta el header Authorization: Bearer <token>")
+			return
+		}
+
+		claims, codigoError := validarSesion(crudo)
+		if claims == nil {
+			switch codigoError {
+			case http.StatusServiceUnavailable:
+				responderError(w, codigoError, "no se pudo validar la sesión — stock-api no responde")
+			default:
+				responderError(w, http.StatusUnauthorized, "token inválido o vencido")
+			}
+			return
+		}
+
+		rol, _ := claims["rol"].(string)
+		if rol != "superadmin" {
+			responderError(w, http.StatusForbidden, "acceso restringido a administradores")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), claveClaims, claims)
+		siguiente(w, r.WithContext(ctx))
+	}
+}
+
 // claimsDe recupera los claims que dejó conAuth en el contexto.
 func claimsDe(r *http.Request) map[string]any {
 	claims, _ := r.Context().Value(claveClaims).(map[string]any)

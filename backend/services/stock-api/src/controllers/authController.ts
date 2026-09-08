@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { ApiError } from '../errors/ApiError.js';
 import * as authService from '../services/authService.js';
+import { verifyAccessToken } from '../services/tokenService.js';
 
 export async function login(req: Request, res: Response) {
   const { usuario, email, identificador, password, dispositivo = '' } = req.body ?? {};
@@ -38,10 +39,25 @@ export async function solicitarTailscaleToken(req: Request, res: Response) {
   res.json(resultado);
 }
 
+function autorizarGestionDispositivos(req: Request, idNegocio: number) {
+  const token = req.headers.authorization?.replace(/^Bearer /, '');
+  if (!token) throw new ApiError(401, 'missing Authorization: Bearer <token> header');
+  let claims: any;
+  try {
+    claims = verifyAccessToken(token);
+  } catch {
+    throw new ApiError(401, 'invalid or expired token');
+  }
+  if (claims?.rol !== 'superadmin' && claims?.negocio !== idNegocio) {
+    throw new ApiError(403, 'acceso no autorizado para este negocio');
+  }
+}
+
 export async function listarDispositivos(req: Request, res: Response) {
   const rawId = Array.isArray(req.params.id_negocio) ? req.params.id_negocio[0] : req.params.id_negocio;
   const idNegocio = parseInt(rawId, 10);
   if (isNaN(idNegocio)) throw new ApiError(400, 'ID de negocio inválido');
+  autorizarGestionDispositivos(req, idNegocio);
   res.json(await authService.obtenerDispositivosNegocio(idNegocio));
 }
 
@@ -51,5 +67,6 @@ export async function eliminarDispositivo(req: Request, res: Response) {
   const idNegocio = parseInt(rawNegocio, 10);
   const idDispositivo = parseInt(rawDev, 10);
   if (isNaN(idNegocio) || isNaN(idDispositivo)) throw new ApiError(400, 'Parámetros inválidos');
+  autorizarGestionDispositivos(req, idNegocio);
   res.json(await authService.desvincularDispositivo(idNegocio, idDispositivo));
 }

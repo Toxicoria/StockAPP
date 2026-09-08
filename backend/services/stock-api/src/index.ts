@@ -12,6 +12,7 @@ import { securityHeaders } from './middleware/security.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { healthRoutes } from './routes/healthRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
+import { adminAuthRoutes } from './routes/adminAuthRoutes.js';
 import { sessionRoutes } from './routes/sessionRoutes.js';
 import { proxyRoutes } from './routes/proxyRoutes.js';
 
@@ -22,6 +23,7 @@ app.use(securityHeaders);
 
 app.use('/api', healthRoutes);
 app.use('/api', authRoutes);
+app.use('/api', adminAuthRoutes);
 app.use(sessionRoutes);
 app.use('/api', proxyRoutes);
 

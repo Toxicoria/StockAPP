@@ -60,9 +60,12 @@ function abrirModalDetalle(negocio: NegocioAdmin) {
 
 onMounted(() => {
   const sesionExistente = obtenerSesionAdmin();
-  if (sesionExistente) {
+  if (sesionExistente && sesionExistente.token) {
     sesionAdmin.value = sesionExistente;
     cargarDatos();
+  } else {
+    cerrarSesionAdmin();
+    sesionAdmin.value = null;
   }
 });
 </script>

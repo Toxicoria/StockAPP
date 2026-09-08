@@ -3,6 +3,7 @@ export interface SuperAdminSesion {
   usuario: string;
   nombre: string;
   email: string;
+  token: string;
 }
 
 const STORAGE_KEY = 'stockapp_superadmin_sesion';
@@ -17,6 +18,11 @@ export function obtenerSesionAdmin(): SuperAdminSesion | null {
   }
 }
 
+export function obtenerTokenAdmin(): string | null {
+  const sesion = obtenerSesionAdmin();
+  return sesion?.token || null;
+}
+
 export function guardarSesionAdmin(sesion: SuperAdminSesion): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sesion));
 }
@@ -24,3 +30,4 @@ export function guardarSesionAdmin(sesion: SuperAdminSesion): void {
 export function cerrarSesionAdmin(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
+

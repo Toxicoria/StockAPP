@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS super_admins (
     email VARCHAR(150),
     password_hash VARCHAR(255) NOT NULL,
     nombre VARCHAR(100) NOT NULL,
+    totp_secret VARCHAR(128),
+    totp_activado BOOLEAN DEFAULT FALSE,
     fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -125,6 +127,8 @@ CREATE TABLE IF NOT EXISTS super_admins (
 --    El init de compose solo ejecuta este archivo con el volumen vacío;
 --    `task db:esquema` lo re-aplica sobre bases vivas sin destruir datos.)
 -- ==============================================================================
+ALTER TABLE super_admins ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(128);
+ALTER TABLE super_admins ADD COLUMN IF NOT EXISTS totp_activado BOOLEAN DEFAULT FALSE;
 ALTER TABLE stock_interno ADD COLUMN IF NOT EXISTS stock_minimo NUMERIC(10, 2) DEFAULT 0;
 ALTER TABLE stock_interno ADD COLUMN IF NOT EXISTS id_proveedor INT REFERENCES proveedores(id_proveedor) ON DELETE SET NULL;
 

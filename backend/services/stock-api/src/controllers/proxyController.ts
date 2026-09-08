@@ -4,18 +4,24 @@ import { verifyAccessToken } from '../services/tokenService.js';
 import * as proxyService from '../services/proxyService.js';
 
 export async function forwardToStockOperations(req: Request, res: Response) {
-  const esRutaPublicaOAdmin =
-    req.originalUrl.startsWith('/api/admin') ||
+  const esRutaPublica =
     req.originalUrl.startsWith('/api/registro') ||
     req.originalUrl.startsWith('/api/ping');
 
-  if (!esRutaPublicaOAdmin) {
+  if (!esRutaPublica) {
     const token = req.headers.authorization?.replace(/^Bearer /, '');
     if (!token) throw new ApiError(401, 'missing Authorization: Bearer <token> header');
+    let claims: any;
     try {
-      verifyAccessToken(token);
+      claims = verifyAccessToken(token);
     } catch {
       throw new ApiError(401, 'invalid or expired token');
+    }
+
+    if (req.originalUrl.startsWith('/api/admin')) {
+      if (claims?.rol !== 'superadmin') {
+        throw new ApiError(403, 'acceso restringido a administradores');
+      }
     }
   }
 

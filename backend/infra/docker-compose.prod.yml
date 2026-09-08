@@ -1,0 +1,92 @@
+services:
+  # 1. Base de datos PostgreSQL (Privada, sin puertos expuestos a internet)
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: stockapp_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-stock_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD es obligatoria en el archivo .env}
+      POSTGRES_DB: ${DB_NAME:-stock_db}
+    volumes:
+      - pg_data_prod:/var/lib/postgresql/data
+      - ../services/stock-operations/model/esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro,z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-stock_admin} -d ${DB_NAME:-stock_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockapp_network
+
+  # 2. Servicio interno de negocio en Go (Privado, solo accesible por el gateway)
+  api_go:
+    build:
+      context: ../services/stock-operations
+    container_name: stockapp_operations
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-stock_admin}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-stock_db}
+      STOCK_API_URL: http://api_ts:3000
+      CONFIG_SECRET_KEY: ${CONFIG_SECRET_KEY:?Error: CONFIG_SECRET_KEY es obligatoria en .env}
+    networks:
+      - stockapp_network
+
+  # 3. stock-api (Gateway Express/TS: Auth, JWT, 2FA y Proxy)
+  api_ts:
+    build:
+      context: ../services/stock-api
+    container_name: stockapp_gateway
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api_go:
+        condition: service_started
+    ports:
+      - "${PORT_API:-3000}:3000"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-stock_admin}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-stock_db}
+      JWT_SECRET: ${JWT_SECRET:?Error: JWT_SECRET es obligatoria en .env}
+      GO_INTERNO: http://api_go:8080
+      PUERTO: "3000"
+      TAILSCALE_API_KEY: ${TAILSCALE_API_KEY:-}
+      TAILSCALE_CLIENT_ID: ${TAILSCALE_CLIENT_ID:-}
+      TAILSCALE_CLIENT_SECRET: ${TAILSCALE_CLIENT_SECRET:-}
+      TAILSCALE_TAILNET: ${TAILSCALE_TAILNET:-}
+    networks:
+      - stockapp_network
+
+  # 4. Panel de Administración (Vue 3 + Nginx)
+  front_admin:
+    build:
+      context: ../../front-admin
+    container_name: stockapp_front_admin
+    restart: unless-stopped
+    depends_on:
+      api_ts:
+        condition: service_started
+    ports:
+      - "${PORT_ADMIN:-5173}:80"
+    networks:
+      - stockapp_network
+
+volumes:
+  pg_data_prod:
+    name: stockapp_pg_data_prod
+
+networks:
+  stockapp_network:
+    name: stockapp_network
+    driver: bridge
