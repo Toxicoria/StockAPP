@@ -32,10 +32,20 @@ app.use(errorHandler);
 
 const port = Number(env('PUERTO', '3000'));
 
-try {
-  await pool.query('SELECT 1');
-} catch (e) {
-  console.error(`[fatal] could not connect to PostgreSQL: ${e}`);
+let conectado = false;
+for (let intento = 1; intento <= 15; intento++) {
+  try {
+    await pool.query('SELECT 1');
+    conectado = true;
+    break;
+  } catch {
+    console.warn(`[warn] esperando a PostgreSQL (intento ${intento}/15)...`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+if (!conectado) {
+  console.error('[fatal] no se pudo conectar a PostgreSQL tras varios intentos');
   process.exit(1);
 }
 

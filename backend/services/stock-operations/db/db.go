@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -12,8 +13,7 @@ import (
 
 var DB *sql.DB
 
-// Iniciar abre y verifica la conexión a PostgreSQL. Si la base no responde,
-// el programa termina acá con un error claro.
+// Iniciar abre y verifica la conexión a PostgreSQL con reintentos automáticos.
 func Iniciar() {
 	// Leemos las credenciales desde variables de entorno.
 	host := Env("DB_HOST", "localhost")
@@ -36,12 +36,18 @@ func Iniciar() {
 		os.Exit(1)
 	}
 
-	if err = DB.Ping(); err != nil {
-		logger.Error("No se pudo conectar a PostgreSQL: %v", err)
-		os.Exit(1)
+	for intento := 1; intento <= 15; intento++ {
+		err = DB.Ping()
+		if err == nil {
+			logger.OK("Conexión a PostgreSQL establecida.")
+			return
+		}
+		logger.Warn("Esperando a PostgreSQL (intento %d/15)...", intento)
+		time.Sleep(2 * time.Second)
 	}
 
-	logger.OK("Conexión a PostgreSQL establecida.")
+	logger.Error("No se pudo conectar a PostgreSQL tras varios intentos: %v", err)
+	os.Exit(1)
 }
 
 // Env lee una variable de entorno y devuelve un valor por defecto si no
