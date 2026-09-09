@@ -12,6 +12,8 @@
     "core:window:allow-destroy",
     "core:app:default",
     "core:window:allow-start-dragging",
-    "core:window:allow-is-maximized"
+    "core:window:allow-is-maximized",
+    "updater:default",
+    "process:default"
   ]
 }

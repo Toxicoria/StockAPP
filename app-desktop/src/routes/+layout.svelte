@@ -5,6 +5,7 @@
   import BarraTitulo from '$lib/componentes/BarraTitulo.svelte';
   import Toast from '$lib/componentes/Toast.svelte';
   import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
+  import ModalActualizacionForzada from '$lib/componentes/ModalActualizacionForzada.svelte';
   import {
     estadoConfirmacion,
     permitiendoCierre,
@@ -13,6 +14,7 @@
     confirmarCerrarApp,
   } from '$lib/confirmacion.svelte.js';
   import { BASE_API } from '$lib/config.js';
+  import { verificarActualizaciones } from '$lib/updater.svelte.js';
 
   let { children } = $props();
 
@@ -63,6 +65,8 @@
       }
     } finally {
       restaurando = false;
+      // Verificar actualizaciones del sistema en segundo plano
+      verificarActualizaciones(true);
     }
   });
 
@@ -81,6 +85,8 @@
     {/if}
   </main>
   <Toast />
+
+  <ModalActualizacionForzada />
 
   <ModalConfirmacion
     abierto={estadoConfirmacion.cerrarApp}
