@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { ApiError } from '../errors/ApiError.js';
 import { verifyAccessToken } from '../services/tokenService.js';
 import * as proxyService from '../services/proxyService.js';
+import { broadcastActualizacion } from '../services/sseService.js';
 
 export async function forwardToStockOperations(req: Request, res: Response) {
   const esWebhookCI =
@@ -56,8 +57,18 @@ export async function forwardToStockOperations(req: Request, res: Response) {
   res.status(upstream.status);
   if (upstream.status === 204) {
     res.end();
-    return;
+  } else {
+    res.type(upstream.headers.get('content-type') ?? 'application/json');
+    res.send(await upstream.text());
   }
-  res.type(upstream.headers.get('content-type') ?? 'application/json');
-  res.send(await upstream.text());
+
+  // Si se modificó o publicó una versión con éxito, notificar por SSE en tiempo real
+  if (
+    upstream.status >= 200 &&
+    upstream.status < 300 &&
+    req.originalUrl.startsWith('/api/admin/versiones') &&
+    ['POST', 'PUT', 'DELETE'].includes(req.method)
+  ) {
+    broadcastActualizacion();
+  }
 }

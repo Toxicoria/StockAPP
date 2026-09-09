@@ -185,3 +185,46 @@ export async function reiniciarYAplicar() {
     window.location.reload();
   }
 }
+
+/** @type {EventSource | null} */
+let fuenteEventos = null;
+
+/**
+ * Inicia el canal pasivo de Server-Sent Events (SSE) para recibir
+ * notificaciones push en tiempo real desde el backend central sin polling.
+ */
+export function iniciarEscuchaEventos() {
+  if (typeof window === 'undefined') return;
+  if (fuenteEventos) return;
+
+  try {
+    const url = `${BASE_API}/api/desktop/stream`;
+    fuenteEventos = new EventSource(url);
+
+    fuenteEventos.addEventListener('actualizacion', (evento) => {
+      console.info('[StockAPP Updater] Ping de actualización recibido por SSE:', evento.data);
+      verificarActualizaciones(true);
+    });
+
+    fuenteEventos.onerror = () => {
+      // EventSource reconecta automáticamente en caso de micro-cortes o suspensión
+      console.debug('[StockAPP Updater] Canal SSE en reconexión...');
+    };
+
+    console.info('[StockAPP Updater] Canal de notificaciones push (SSE) activo.');
+  } catch (err) {
+    console.warn('[StockAPP Updater] No se pudo inicializar canal SSE:', err);
+  }
+}
+
+/**
+ * Cierra la conexión SSE al destruir el layout o cerrar la app.
+ */
+export function detenerEscuchaEventos() {
+  if (fuenteEventos) {
+    fuenteEventos.close();
+    fuenteEventos = null;
+    console.info('[StockAPP Updater] Canal de notificaciones push (SSE) cerrado.');
+  }
+}
+

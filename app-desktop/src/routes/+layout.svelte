@@ -14,7 +14,11 @@
     confirmarCerrarApp,
   } from '$lib/confirmacion.svelte.js';
   import { BASE_API } from '$lib/config.js';
-  import { verificarActualizaciones } from '$lib/updater.svelte.js';
+  import {
+    verificarActualizaciones,
+    iniciarEscuchaEventos,
+    detenerEscuchaEventos,
+  } from '$lib/updater.svelte.js';
 
   let { children } = $props();
 
@@ -70,12 +74,15 @@
       }
     } finally {
       restaurando = false;
-      // Verificar actualizaciones del sistema en segundo plano
+      // Verificar actualizaciones del sistema en segundo plano al arrancar
       verificarActualizaciones(true);
+      // Iniciar canal push pasivo en tiempo real (SSE)
+      iniciarEscuchaEventos();
     }
   });
 
   onDestroy(() => {
+    detenerEscuchaEventos();
     if (desescucharCierre) {
       desescucharCierre();
     }

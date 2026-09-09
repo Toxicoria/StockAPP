@@ -14,6 +14,7 @@ import { healthRoutes } from './routes/healthRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { adminAuthRoutes } from './routes/adminAuthRoutes.js';
 import { sessionRoutes } from './routes/sessionRoutes.js';
+import { desktopRoutes } from './routes/desktopRoutes.js';
 import { proxyRoutes } from './routes/proxyRoutes.js';
 
 const app = express();
@@ -22,6 +23,7 @@ app.use(cors);
 app.use(securityHeaders);
 
 app.use('/api', healthRoutes);
+app.use('/api', desktopRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminAuthRoutes);
 app.use(sessionRoutes);
