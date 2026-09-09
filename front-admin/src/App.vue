@@ -1,28 +1,41 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import type { NegocioAdmin } from './types/negocio';
-import { obtenerNegocios } from './services/api';
+import type { VersionDesktop } from './types/version';
+import { obtenerNegocios, obtenerVersiones } from './services/api';
 import { obtenerSesionAdmin, cerrarSesionAdmin, type SuperAdminSesion } from './services/auth';
 
 import LoginAdmin from './components/LoginAdmin.vue';
 import StatsHeader from './components/StatsHeader.vue';
 import TablaNegocios from './components/TablaNegocios.vue';
+import TablaVersiones from './components/TablaVersiones.vue';
 import ModalCrearNegocio from './components/ModalCrearNegocio.vue';
 import ModalPassword from './components/ModalPassword.vue';
 import ModalDetalleNegocio from './components/ModalDetalleNegocio.vue';
+import ModalVersion from './components/ModalVersion.vue';
 
 const sesionAdmin = ref<SuperAdminSesion | null>(null);
+const pestanaActiva = ref<'negocios' | 'versiones'>('negocios');
 
+// Negocios
 const negocios = ref<NegocioAdmin[]>([]);
 const cargando = ref(true);
 const error = ref('');
 
+// Versiones
+const versiones = ref<VersionDesktop[]>([]);
+const cargandoVersiones = ref(false);
+
+// Modales Negocios
 const modalCrearAbierto = ref(false);
 const modalPasswordAbierto = ref(false);
 const modalDetalleAbierto = ref(false);
-
 const negocioSeleccionadoPassword = ref<NegocioAdmin | null>(null);
 const negocioSeleccionadoDetalle = ref<NegocioAdmin | null>(null);
+
+// Modales Versiones
+const modalVersionAbierto = ref(false);
+const versionSeleccionadaEditar = ref<VersionDesktop | null>(null);
 
 function alAutenticar(sesion: SuperAdminSesion) {
   sesionAdmin.value = sesion;
@@ -33,10 +46,10 @@ function salir() {
   cerrarSesionAdmin();
   sesionAdmin.value = null;
   negocios.value = [];
+  versiones.value = [];
 }
 
-async function cargarDatos() {
-  if (!sesionAdmin.value) return;
+async function cargarNegocios() {
   cargando.value = true;
   error.value = '';
   try {
@@ -48,6 +61,30 @@ async function cargarDatos() {
   }
 }
 
+async function cargarVersiones() {
+  cargandoVersiones.value = true;
+  try {
+    versiones.value = await obtenerVersiones();
+  } catch (e: any) {
+    console.error('Error al cargar versiones:', e);
+  } finally {
+    cargandoVersiones.value = false;
+  }
+}
+
+async function cargarDatos() {
+  if (!sesionAdmin.value) return;
+  await Promise.all([cargarNegocios(), cargarVersiones()]);
+}
+
+function refrescarActual() {
+  if (pestanaActiva.value === 'negocios') {
+    cargarNegocios();
+  } else {
+    cargarVersiones();
+  }
+}
+
 function abrirModalPassword(negocio: NegocioAdmin) {
   negocioSeleccionadoPassword.value = negocio;
   modalPasswordAbierto.value = true;
@@ -56,6 +93,16 @@ function abrirModalPassword(negocio: NegocioAdmin) {
 function abrirModalDetalle(negocio: NegocioAdmin) {
   negocioSeleccionadoDetalle.value = negocio;
   modalDetalleAbierto.value = true;
+}
+
+function abrirModalCrearVersion() {
+  versionSeleccionadaEditar.value = null;
+  modalVersionAbierto.value = true;
+}
+
+function abrirModalEditarVersion(v: VersionDesktop) {
+  versionSeleccionadaEditar.value = v;
+  modalVersionAbierto.value = true;
 }
 
 onMounted(() => {
@@ -79,14 +126,37 @@ onMounted(() => {
     <!-- BARRA SUPERIOR -->
     <header class="admin-header">
       <div class="header-contenido">
-        <div class="brand">
-          <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
+        <div class="brand-section">
+          <div class="brand">
+            <div class="logo">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
+            </div>
+            <div>
+              <h1>StockAPP Admin</h1>
+              <p class="subtitulo">Panel de Gestión Centralizada</p>
+            </div>
           </div>
-          <div>
-            <h1>StockAPP Admin</h1>
-            <p class="subtitulo">Panel de Administración de Clientes y Negocios</p>
-          </div>
+
+          <!-- NAVEGACIÓN ENTRE SECCIONES -->
+          <nav class="nav-modulos">
+            <button
+              :class="['nav-tab', { activo: pestanaActiva === 'negocios' }]"
+              @click="pestanaActiva = 'negocios'"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span>Clientes y Negocios</span>
+              <span class="tab-counter">{{ negocios.length }}</span>
+            </button>
+
+            <button
+              :class="['nav-tab', { activo: pestanaActiva === 'versiones' }]"
+              @click="pestanaActiva = 'versiones'"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+              <span>Versiones Desktop</span>
+              <span class="tab-counter">{{ versiones.length }}</span>
+            </button>
+          </nav>
         </div>
 
         <div class="acciones-header">
@@ -95,14 +165,29 @@ onMounted(() => {
             <code class="tag-usr">@{{ sesionAdmin.usuario }}</code>
           </div>
 
-          <button class="btn btn-secondary" title="Actualizar datos" @click="cargarDatos">
+          <button class="btn btn-secondary" title="Actualizar datos" @click="refrescarActual">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
             <span>Refrescar</span>
           </button>
-          <button class="btn btn-primary" @click="modalCrearAbierto = true">
+
+          <button
+            v-if="pestanaActiva === 'negocios'"
+            class="btn btn-primary"
+            @click="modalCrearAbierto = true"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Nuevo Cliente / Negocio</span>
           </button>
+
+          <button
+            v-else
+            class="btn btn-primary"
+            @click="abrirModalCrearVersion"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Nueva Versión Manual</span>
+          </button>
+
           <button class="btn btn-ghost" title="Cerrar sesión" @click="salir">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
           </button>
@@ -117,35 +202,57 @@ onMounted(() => {
         <button class="btn btn-secondary btn-sm" @click="cargarDatos">Reintentar</button>
       </div>
 
-      <StatsHeader :negocios="negocios" />
+      <!-- VISTA 1: NEGOCIOS Y CLIENTES -->
+      <template v-if="pestanaActiva === 'negocios'">
+        <StatsHeader :negocios="negocios" />
 
-      <TablaNegocios
-        :negocios="negocios"
-        :cargando="cargando"
-        @abrir-modal-password="abrirModalPassword"
-        @abrir-modal-detalle="abrirModalDetalle"
-      />
+        <TablaNegocios
+          :negocios="negocios"
+          :cargando="cargando"
+          @abrir-modal-password="abrirModalPassword"
+          @abrir-modal-detalle="abrirModalDetalle"
+        />
+      </template>
+
+      <!-- VISTA 2: VERSIONES DESKTOP -->
+      <template v-else>
+        <TablaVersiones
+          :versiones="versiones"
+          :cargando="cargandoVersiones"
+          @abrir-modal-crear="abrirModalCrearVersion"
+          @abrir-modal-editar="abrirModalEditarVersion"
+          @recargar="cargarVersiones"
+        />
+      </template>
     </main>
 
-    <!-- MODALES -->
+    <!-- MODALES DE NEGOCIOS -->
     <ModalCrearNegocio
       :abierto="modalCrearAbierto"
       @cerrar="modalCrearAbierto = false"
-      @creado="cargarDatos"
+      @creado="cargarNegocios"
     />
 
     <ModalPassword
       :abierto="modalPasswordAbierto"
       :negocio="negocioSeleccionadoPassword"
       @cerrar="modalPasswordAbierto = false"
-      @actualizado="cargarDatos"
+      @actualizado="cargarNegocios"
     />
 
     <ModalDetalleNegocio
       :abierto="modalDetalleAbierto"
       :negocio="negocioSeleccionadoDetalle"
       @cerrar="modalDetalleAbierto = false"
-      @actualizado="cargarDatos"
+      @actualizado="cargarNegocios"
+    />
+
+    <!-- MODAL DE VERSIONES -->
+    <ModalVersion
+      :abierto="modalVersionAbierto"
+      :version-editar="versionSeleccionadaEditar"
+      @cerrar="modalVersionAbierto = false"
+      @guardado="cargarVersiones"
     />
   </div>
 </template>
@@ -170,6 +277,56 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.nav-modulos {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+
+.nav-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab.activo {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(46, 110, 115, 0.3);
+}
+
+.tab-counter {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-family: monospace;
 }
 
 .brand {

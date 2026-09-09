@@ -1,4 +1,5 @@
 import type { NegocioAdmin, CrearNegocioPayload, DispositivoCliente } from '../types/negocio';
+import type { VersionDesktop, CrearVersionPayload, EditarVersionPayload } from '../types/version';
 import { obtenerTokenAdmin, cerrarSesionAdmin } from './auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -119,3 +120,39 @@ export async function desvincularDispositivo(idNegocio: number, idDispositivo: n
     method: 'DELETE',
   });
 }
+
+// ==============================================================================
+// 💻 CONTROL DE VERSIONES DESKTOP
+// ==============================================================================
+export async function obtenerVersiones(): Promise<VersionDesktop[]> {
+  const data = await pedirApi<{ versiones: VersionDesktop[] }>('/api/admin/versiones');
+  return data.versiones || [];
+}
+
+export async function crearVersion(payload: CrearVersionPayload): Promise<{
+  id: number;
+  version: string;
+  mensaje: string;
+}> {
+  return pedirApi('/api/admin/versiones', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actualizarVersion(
+  id: number,
+  payload: EditarVersionPayload,
+): Promise<{ mensaje: string }> {
+  return pedirApi(`/api/admin/versiones/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function eliminarVersion(id: number): Promise<{ mensaje: string }> {
+  return pedirApi(`/api/admin/versiones/${id}`, {
+    method: 'DELETE',
+  });
+}
+
