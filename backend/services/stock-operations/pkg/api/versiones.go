@@ -122,6 +122,9 @@ func esVersionMenor(vActual, vReferencia string) bool {
 // GET /api/desktop/update/{target}/{current_version}
 func desktopUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	target := strings.TrimSpace(r.PathValue("target"))
+	if target == "" && r.PathValue("os") != "" {
+		target = strings.TrimSpace(r.PathValue("os")) + "-" + strings.TrimSpace(r.PathValue("arch"))
+	}
 	currentVersion := strings.TrimSpace(r.PathValue("current_version"))
 
 	if currentVersion == "" {

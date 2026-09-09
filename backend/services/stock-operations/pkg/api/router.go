@@ -46,6 +46,7 @@ func Router() *http.ServeMux {
 
 	// Gestión de versiones desktop (front-admin) y Tauri Updater
 	mux.HandleFunc("GET /api/desktop/update/{target}/{current_version}", conCORS(desktopUpdateHandler))
+	mux.HandleFunc("GET /api/desktop/update/{os}/{arch}/{current_version}", conCORS(desktopUpdateHandler))
 	mux.HandleFunc("GET /api/admin/versiones", conCORS(conSuperAdminAuth(adminListarVersionesHandler)))
 	mux.HandleFunc("POST /api/admin/versiones", conCORS(conSuperAdminAuth(adminCrearVersionHandler)))
 	mux.HandleFunc("PUT /api/admin/versiones/{id}", conCORS(conSuperAdminAuth(adminEditarVersionHandler)))
