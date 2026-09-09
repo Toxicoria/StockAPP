@@ -292,6 +292,12 @@ func adminCrearVersionHandler(w http.ResponseWriter, r *http.Request) {
 		body.Estado = "borrador"
 	}
 
+	var publicadaEn *time.Time
+	if body.Estado == "publicada" {
+		ahora := time.Now().UTC()
+		publicadaEn = &ahora
+	}
+
 	query := `
 		INSERT INTO versiones_desktop (
 			version, version_minima, es_obligatoria, canal, estado,
@@ -302,7 +308,7 @@ func adminCrearVersionHandler(w http.ResponseWriter, r *http.Request) {
 			$1, $2, $3, $4, $5,
 			$6, $7, $8, $9,
 			$10, $11,
-			CASE WHEN $5 = 'publicada' THEN CURRENT_TIMESTAMP ELSE NULL END
+			$12
 		) RETURNING id, to_char(creada_en, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), to_char(actualizada_en, 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
 	`
 
@@ -311,7 +317,7 @@ func adminCrearVersionHandler(w http.ResponseWriter, r *http.Request) {
 	err := db.DB.QueryRowContext(r.Context(), query,
 		body.Version, body.VersionMinima, body.EsObligatoria, body.Canal, body.Estado,
 		body.URLWindows, body.FirmaWindows, body.URLLinux, body.FirmaLinux,
-		body.NotasVersion, body.MotivoObligatoria,
+		body.NotasVersion, body.MotivoObligatoria, publicadaEn,
 	).Scan(&id, &creadaEn, &actualizadaEn)
 
 	if err != nil {
@@ -419,7 +425,7 @@ func adminEditarVersionHandler(w http.ResponseWriter, r *http.Request) {
 			notas_version = $9,
 			motivo_obligatoria = $10,
 			publicada_en = CASE
-				WHEN $4 = 'publicada' AND publicada_en IS NULL THEN CURRENT_TIMESTAMP
+				WHEN $4::varchar = 'publicada' AND publicada_en IS NULL THEN CURRENT_TIMESTAMP
 				ELSE publicada_en
 			END,
 			actualizada_en = CURRENT_TIMESTAMP
