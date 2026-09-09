@@ -5,78 +5,119 @@
 
 {#if estadoUpdater.disponible && estadoUpdater.esObligatoria}
   <div class="bloqueo-fondo">
-    <div class="tarjeta-modal">
-      <div class="icono-alerta">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
-          <line x1="12" y1="9" x2="12" y2="13"></line>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-      </div>
-
-      <h2>Actualización Obligatoria Requerida</h2>
-      <div class="badge-version">v{estadoUpdater.versionNueva}</div>
-
-      <p class="mensaje-explicativo">
-        Esta versión contiene cambios estructurales indispensables para operar con el servidor central de StockAPP.
-        {#if estadoUpdater.motivo}
-          <span class="motivo-caja">
-            <strong>Motivo:</strong> {estadoUpdater.motivo}
-          </span>
-        {/if}
-      </p>
-
-      <!-- BARRA DE PROGRESO DE DESCARGA -->
-      <div class="progreso-contenedor">
-        <div class="progreso-etiquetas">
-          <span>
-            {#if estadoUpdater.descargada}
-              ✅ Descarga completa. Lista para instalar.
-            {:else if estadoUpdater.descargando}
-              Descargando paquete de actualización...
-            {:else}
-              Preparando descarga...
-            {/if}
-          </span>
-          <span class="porcentaje">{estadoUpdater.progreso}%</span>
+    <div class="tarjeta-modal" role="alertdialog" aria-modal="true">
+      <div class="cabecera">
+        <div class="icono-alerta">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
         </div>
-
-        <div class="barra-track">
-          <div class="barra-fill" style="width: {estadoUpdater.progreso}%;"></div>
+        <div class="titulos">
+          <div class="fila-titulo">
+            <h2>Actualización Requerida</h2>
+            <span class="badge-version">v{estadoUpdater.versionNueva}</span>
+          </div>
+          <span class="subtitulo text-muted">Es necesario actualizar para continuar utilizando StockAPP.</span>
         </div>
       </div>
+
+      {#if estadoUpdater.motivo}
+        <div class="motivo-caja">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span><strong>Motivo:</strong> {estadoUpdater.motivo}</span>
+        </div>
+      {/if}
 
       {#if estadoUpdater.notas}
         <div class="notas-caja">
           <span class="notas-titulo">Novedades de esta versión:</span>
-          <p>{estadoUpdater.notas}</p>
+          <p class="notas-texto">{estadoUpdater.notas}</p>
+        </div>
+      {/if}
+
+      <!-- PROGRESO (SOLO VISIBLE CUANDO COMIENZA LA DESCARGA O FINALIZA) -->
+      {#if estadoUpdater.descargando || estadoUpdater.descargada}
+        <div class="progreso-contenedor">
+          <div class="progreso-etiquetas">
+            <span class="estado-texto">
+              {#if estadoUpdater.descargada}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Descarga completa. Lista para instalar.</span>
+              {:else}
+                <svg class="anim-girar" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <span>Descargando actualización...</span>
+              {/if}
+            </span>
+            <span class="porcentaje">{estadoUpdater.progreso}%</span>
+          </div>
+
+          <div class="barra-track">
+            <div class="barra-fill" style="width: {estadoUpdater.progreso}%;"></div>
+          </div>
         </div>
       {/if}
 
       {#if estadoUpdater.error}
         <div class="alerta-error">
-          <span>{estadoUpdater.error}</span>
-          <button class="btn-reintentar" onclick={iniciarDescargaEInstalacion}>Reintentar</button>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span class="error-texto">{estadoUpdater.error}</span>
+          <button type="button" class="btn-reintentar" onclick={iniciarDescargaEInstalacion}>Reintentar</button>
         </div>
       {/if}
 
       <!-- ACCIONES -->
       <div class="acciones-pie">
-        <button class="btn-salir" onclick={solicitarCerrarApp}>
+        <button type="button" class="btn btn-secondary" onclick={solicitarCerrarApp}>
           Salir del sistema
         </button>
 
-        <button
-          class="btn-instalar"
-          disabled={!estadoUpdater.descargada}
-          onclick={reiniciarYAplicar}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-          <span>{estadoUpdater.descargada ? 'Reiniciar e Instalar Ahora' : 'Descargando...'}</span>
-        </button>
+        {#if !estadoUpdater.descargando && !estadoUpdater.descargada}
+          <button
+            type="button"
+            class="btn btn-primary btn-accion"
+            onclick={iniciarDescargaEInstalacion}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Actualizar</span>
+          </button>
+        {:else if estadoUpdater.descargando}
+          <button type="button" class="btn btn-primary btn-accion" disabled>
+            <svg class="anim-girar" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+            </svg>
+            <span>Descargando ({estadoUpdater.progreso}%)...</span>
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="btn btn-primary btn-accion"
+            onclick={reiniciarYAplicar}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span>Reiniciar e Instalar</span>
+          </button>
+        {/if}
       </div>
     </div>
   </div>
@@ -86,214 +127,222 @@
   .bloqueo-fondo {
     position: fixed;
     inset: 0;
-    background: rgba(11, 19, 23, 0.88);
+    background: rgba(15, 41, 44, 0.72);
     backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: var(--space-4);
     user-select: none;
   }
 
   .tarjeta-modal {
-    background: #121d23;
-    border: 1px solid rgba(245, 158, 11, 0.4);
-    border-radius: 16px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6), 0 0 32px rgba(245, 158, 11, 0.1);
-    max-width: 520px;
+    background: #fbfcfc;
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    max-width: 500px;
     width: 100%;
-    padding: 32px 28px 26px;
+    padding: var(--space-5);
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 14px;
+    gap: var(--space-4);
     animation: aparecer 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @keyframes aparecer {
-    from { opacity: 0; transform: scale(0.96); }
+    from { opacity: 0; transform: scale(0.97); }
     to { opacity: 1; transform: scale(1); }
   }
 
+  .cabecera {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
   .icono-alerta {
-    width: 60px;
-    height: 60px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
     border-radius: 50%;
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent-600);
+    border: 1px solid var(--color-accent-200);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
+  .titulos {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .fila-titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
   h2 {
-    font-size: 19px;
+    font-family: var(--font-heading);
+    font-size: 18px;
     font-weight: 700;
-    color: #f1f5f9;
+    color: var(--color-text);
     margin: 0;
   }
 
   .badge-version {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.35);
+    background: var(--color-accent-100);
+    color: var(--color-accent-700);
+    border: 1px solid var(--color-accent-300);
     font-family: monospace;
     font-weight: 700;
-    font-size: 13px;
-    padding: 3px 10px;
-    border-radius: 6px;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
   }
 
-  .mensaje-explicativo {
-    font-size: 13.5px;
-    color: #94a3b8;
-    line-height: 1.5;
-    margin: 0;
+  .subtitulo {
+    font-size: 13px;
+    line-height: 1.4;
   }
 
   .motivo-caja {
-    display: block;
-    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: #cbd5e1;
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    border: 1px solid var(--color-accent-200);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--color-accent-800);
+  }
+
+  .notas-caja {
+    width: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 130px;
+    overflow-y: auto;
+  }
+
+  .notas-titulo {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .notas-texto {
+    font-size: 13px;
+    color: color-mix(in srgb, var(--color-text) 80%, transparent);
+    line-height: 1.45;
+    margin: 0;
   }
 
   /* BARRA DE PROGRESO */
   .progreso-contenedor {
-    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 8px;
+    margin-top: 2px;
   }
 
   .progreso-etiquetas {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--color-text);
+  }
+
+  .estado-texto {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: color-mix(in srgb, var(--color-text) 80%, transparent);
   }
 
   .porcentaje {
     font-weight: 700;
-    color: #fbbf24;
+    color: var(--color-accent-600);
     font-family: monospace;
   }
 
   .barra-track {
     width: 100%;
     height: 8px;
-    background: #1e293b;
-    border-radius: 8px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-divider);
+    border-radius: 99px;
     overflow: hidden;
   }
 
   .barra-fill {
     height: 100%;
-    background: linear-gradient(90deg, #f59e0b, #eab308);
+    background: var(--color-accent-600);
+    border-radius: 99px;
     transition: width 0.3s ease;
   }
 
-  .notas-caja {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.25);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
-    padding: 10px 14px;
-    text-align: left;
-    font-size: 12px;
-    color: #94a3b8;
-    max-height: 80px;
-    overflow-y: auto;
-  }
-
-  .notas-titulo {
-    display: block;
-    font-weight: 600;
-    color: #cbd5e1;
-    margin-bottom: 3px;
-  }
-
   .alerta-error {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
+    background: color-mix(in srgb, var(--color-peligro) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-peligro) 30%, transparent);
+    color: var(--color-peligro);
     padding: 8px 12px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 12px;
-    width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .error-texto {
+    flex: 1;
   }
 
   .btn-reintentar {
-    background: rgba(239, 68, 68, 0.3);
+    background: var(--color-peligro);
     border: none;
     color: #ffffff;
-    padding: 3px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 11px;
-  }
-
-  /* BOTONES */
-  .acciones-pie {
-    width: 100%;
-    display: flex;
-    gap: 12px;
-    margin-top: 10px;
-  }
-
-  .btn-salir {
-    flex: 1;
-    height: 42px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: #94a3b8;
-    border-radius: 10px;
+    font-size: 12px;
     font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s ease;
   }
 
-  .btn-salir:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #f1f5f9;
+  /* ACCIONES */
+  .acciones-pie {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-divider);
   }
 
-  .btn-instalar {
-    flex: 1.8;
-    height: 42px;
-    background: #f59e0b;
-    border: none;
-    color: #0b1317;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 13.5px;
-    cursor: pointer;
+  .btn-accion {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
-    transition: all 0.15s ease;
+    gap: 6px;
   }
 
-  .btn-instalar:hover:not(:disabled) {
-    background: #d97706;
-    transform: translateY(-1px);
+  .anim-girar {
+    animation: girar 1s linear infinite;
   }
 
-  .btn-instalar:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    box-shadow: none;
+  @keyframes girar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>

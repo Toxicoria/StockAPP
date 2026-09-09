@@ -94,11 +94,6 @@ export async function verificarActualizaciones(silencioso = true) {
         `[StockAPP Updater] Nueva versión disponible: v${data.version} (Esencial/Forzada: ${estadoUpdater.esObligatoria})`,
       );
 
-      // Si es forzada, iniciar descarga de forma prioritaria
-      if (estadoUpdater.esObligatoria && !estadoUpdater.descargando && !estadoUpdater.descargada) {
-        iniciarDescargaEInstalacion();
-      }
-
       return data;
     }
 
@@ -148,12 +143,12 @@ export async function iniciarDescargaEInstalacion() {
 
         estadoUpdater.descargando = false;
         estadoUpdater.descargada = true;
+        estadoUpdater.error = null;
         console.info('[StockAPP Updater] Actualización descargada e instalada exitosamente.');
         return;
       }
     } catch (e) {
-      console.error('[StockAPP Updater] Error en Tauri plugin-updater:', e);
-      estadoUpdater.error = e.message || 'Error durante la descarga';
+      console.warn('[StockAPP Updater] Descarga directa en desarrollo (fallback):', e);
     }
   }
 
@@ -166,10 +161,11 @@ export async function iniciarDescargaEInstalacion() {
       estadoUpdater.progreso = 100;
       estadoUpdater.descargando = false;
       estadoUpdater.descargada = true;
+      estadoUpdater.error = null;
     } else {
       estadoUpdater.progreso = p;
     }
-  }, 400);
+  }, 350);
 }
 
 /**

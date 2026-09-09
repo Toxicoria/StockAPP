@@ -36,7 +36,7 @@
     <div class="update-banner">
       {#if estadoUpdater.descargada}
         <button class="update-pill pill-ready" onclick={reiniciarYAplicar} title="Actualización descargada. Clic para reiniciar y aplicar.">
-          <span class="dot-green">●</span>
+          <svg width="7" height="7" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"></circle></svg>
           <span>v{estadoUpdater.versionNueva} lista</span>
           <span class="action-btn-mini">Reiniciar</span>
         </button>
@@ -47,7 +47,7 @@
         </div>
       {:else}
         <button class="update-pill pill-available" onclick={iniciarDescargaEInstalacion} title={estadoUpdater.notas || 'Nueva versión opcional disponible'}>
-          <span class="dot-accent">●</span>
+          <svg width="7" height="7" viewBox="0 0 10 10" fill="var(--color-accent-600)"><circle cx="5" cy="5" r="5"></circle></svg>
           <span>v{estadoUpdater.versionNueva} disponible</span>
           <span class="action-btn-mini">Actualizar</span>
         </button>

@@ -63,6 +63,11 @@
       if (window.location.pathname !== '/login') {
         await goto('/login');
       }
+    } catch (e) {
+      console.warn('Error conectando a la API al iniciar:', e);
+      if (window.location.pathname !== '/login') {
+        await goto('/login');
+      }
     } finally {
       restaurando = false;
       // Verificar actualizaciones del sistema en segundo plano
