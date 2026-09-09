@@ -63,3 +63,15 @@ Thumbs.db
 *.log
 *.tmp
 *.temp
+
+# Manuales, Documentación Técnica y Exportaciones
+MANUAL_*
+DOCUMENTO_*
+ARQUITECTURA_*
+*.pdf
+
+# Archivos de Contexto y Planes de Trabajo con IA
+.agents/
+*plan*.md
+implementation_plan.md
+
