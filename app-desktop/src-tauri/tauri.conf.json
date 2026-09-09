@@ -37,6 +37,7 @@
   },
   "plugins": {
     "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1MjE2NDY2NjVCNkYzRTgKUldUbzg3WmxabVFoSlQ2UGl5cGtFQTN2NEdGSGZMSzZpdTRPdEQzVFBBWmpmSEEyRmlEMEo5SEsK",
       "endpoints": [
         "http://localhost:3000/api/desktop/update/{{target}}/{{current_version}}"
       ]
