@@ -44,6 +44,14 @@ func Router() *http.ServeMux {
 	mux.HandleFunc("PUT /api/admin/negocios/{id_negocio}", conCORS(conSuperAdminAuth(adminEditarNegocioHandler)))
 	mux.HandleFunc("PUT /api/admin/usuarios/{id_usuario}/password", conCORS(conSuperAdminAuth(adminCambiarPasswordHandler)))
 
+	// Gestión de versiones desktop (front-admin) y Tauri Updater
+	mux.HandleFunc("GET /api/desktop/update/{target}/{current_version}", conCORS(desktopUpdateHandler))
+	mux.HandleFunc("GET /api/admin/versiones", conCORS(conSuperAdminAuth(adminListarVersionesHandler)))
+	mux.HandleFunc("POST /api/admin/versiones", conCORS(conSuperAdminAuth(adminCrearVersionHandler)))
+	mux.HandleFunc("PUT /api/admin/versiones/{id}", conCORS(conSuperAdminAuth(adminEditarVersionHandler)))
+	mux.HandleFunc("DELETE /api/admin/versiones/{id}", conCORS(conSuperAdminAuth(adminEliminarVersionHandler)))
+	mux.HandleFunc("POST /api/admin/versiones/webhook", conCORS(webhookRegistrarVersionHandler))
+
 	// Preflight CORS: el mux con patrones "MÉTODO /ruta" respondería 405 a
 	// OPTIONS si no hubiera un catch-all; conCORS corta con 204.
 	mux.HandleFunc("OPTIONS /api/", conCORS(func(w http.ResponseWriter, r *http.Request) {}))

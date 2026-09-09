@@ -4,9 +4,15 @@ import { verifyAccessToken } from '../services/tokenService.js';
 import * as proxyService from '../services/proxyService.js';
 
 export async function forwardToStockOperations(req: Request, res: Response) {
+  const esWebhookCI =
+    req.originalUrl.startsWith('/api/admin/versiones/webhook') &&
+    Boolean(req.headers['x-webhook-secret']);
+
   const esRutaPublica =
     req.originalUrl.startsWith('/api/registro') ||
-    req.originalUrl.startsWith('/api/ping');
+    req.originalUrl.startsWith('/api/ping') ||
+    req.originalUrl.startsWith('/api/desktop/update') ||
+    esWebhookCI;
 
   if (!esRutaPublica) {
     const token = req.headers.authorization?.replace(/^Bearer /, '');
@@ -25,9 +31,23 @@ export async function forwardToStockOperations(req: Request, res: Response) {
     }
   }
 
+  const extraHeaders: Record<string, string> = {};
+  if (req.headers['x-webhook-secret']) {
+    extraHeaders['X-Webhook-Secret'] = String(req.headers['x-webhook-secret']);
+  }
+  if (req.headers['x-app-version']) {
+    extraHeaders['X-App-Version'] = String(req.headers['x-app-version']);
+  }
+
   let upstream: globalThis.Response;
   try {
-    upstream = await proxyService.forward(req.method, req.originalUrl, req.headers.authorization ?? '', req.body);
+    upstream = await proxyService.forward(
+      req.method,
+      req.originalUrl,
+      req.headers.authorization ?? '',
+      req.body,
+      extraHeaders
+    );
   } catch (e) {
     console.error(`[proxy] stock-operations unreachable: ${e}`);
     throw new ApiError(502, 'upstream service unavailable');

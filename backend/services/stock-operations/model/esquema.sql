@@ -181,3 +181,27 @@ CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_nombre ON usuarios (id_negocio, LOWER(nombre));
 CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_negocio_username ON usuarios (id_negocio, LOWER(usuario));
 CREATE INDEX IF NOT EXISTS idx_dispositivos_negocio_activo ON dispositivos_cliente (id_negocio, activo);
+
+-- ==============================================================================
+-- 💻 10. VERSIONES DESKTOP (Gestión de releases y actualización Tauri 2)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS versiones_desktop (
+    id SERIAL PRIMARY KEY,
+    version VARCHAR(32) UNIQUE NOT NULL,
+    version_minima VARCHAR(32) NOT NULL DEFAULT '0.1.0',
+    es_obligatoria BOOLEAN DEFAULT FALSE,
+    canal VARCHAR(20) DEFAULT 'produccion',
+    estado VARCHAR(20) DEFAULT 'borrador',
+    url_windows TEXT,
+    firma_windows TEXT,
+    url_linux TEXT,
+    firma_linux TEXT,
+    notas_version TEXT,
+    motivo_obligatoria TEXT,
+    publicada_en TIMESTAMP,
+    creada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actualizada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_versiones_desktop_estado ON versiones_desktop (estado, creada_en DESC);
+CREATE INDEX IF NOT EXISTS idx_versiones_desktop_version ON versiones_desktop (version);
