@@ -170,7 +170,7 @@ export async function login(
   return issueTokens(user, device, deviceInfo, tsAuthKey);
 }
 
-export async function refresh(refreshToken: string) {
+export async function refresh(refreshToken: string, deviceInfo?: DeviceInfo) {
   const { rows } = await pool.query(
     `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio, u.nombre, u.rol,
             COALESCE(u.permisos, '["vender", "stock"]'::jsonb) as permisos,
@@ -194,7 +194,12 @@ export async function refresh(refreshToken: string) {
   if (new Date(row.expira_en).getTime() < Date.now()) {
     throw new ApiError(401, 'session expired, please log in again');
   }
-  return issueTokens(row, row.dispositivo ?? '', undefined, row.ts_auth_key);
+
+  if (deviceInfo?.device_id) {
+    await registrarOVerificarDispositivo(row.id_negocio, row.max_dispositivos || 4, deviceInfo);
+  }
+
+  return issueTokens(row, row.dispositivo ?? '', deviceInfo, row.ts_auth_key);
 }
 
 export async function logout(refreshToken: string) {
@@ -282,6 +287,15 @@ export async function obtenerTailscaleKey(
 }
 
 export async function obtenerDispositivosNegocio(idNegocio: number) {
+  // Asegurar que el negocio tenga su clave de red generada
+  const { rows: negRows } = await pool.query<{ nombre_negocio: string; ts_auth_key: string }>(
+    `SELECT nombre_negocio, ts_auth_key FROM negocios WHERE id_negocio = $1`,
+    [idNegocio],
+  );
+  if (negRows.length > 0 && (!negRows[0].ts_auth_key || !negRows[0].ts_auth_key.trim())) {
+    await asegurarTailscaleKey(idNegocio, negRows[0].nombre_negocio || 'Negocio');
+  }
+
   const { rows } = await pool.query(
     `SELECT id_dispositivo, device_id, nombre_dispositivo, tipo_dispositivo, fecha_registro, ultima_conexion, activo
        FROM dispositivos_cliente

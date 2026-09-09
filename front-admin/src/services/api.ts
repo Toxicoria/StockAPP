@@ -112,11 +112,11 @@ export async function actualizarNegocio(
 }
 
 export async function obtenerDispositivosNegocio(idNegocio: number): Promise<DispositivoCliente[]> {
-  return pedirApi<DispositivoCliente[]>(`/api/auth/negocios/${idNegocio}/dispositivos`);
+  return pedirApi<DispositivoCliente[]>(`/api/negocios/${idNegocio}/dispositivos`);
 }
 
 export async function desvincularDispositivo(idNegocio: number, idDispositivo: number): Promise<{ ok: boolean }> {
-  return pedirApi<{ ok: boolean }>(`/api/auth/negocios/${idNegocio}/dispositivos/${idDispositivo}`, {
+  return pedirApi<{ ok: boolean }>(`/api/negocios/${idNegocio}/dispositivos/${idDispositivo}`, {
     method: 'DELETE',
   });
 }

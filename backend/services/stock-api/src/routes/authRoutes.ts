@@ -12,4 +12,6 @@ authRoutes.post('/obtener-tailscale-key', authController.solicitarTailscaleToken
 
 // Gestión de dispositivos vinculados (para front-admin o ajustes)
 authRoutes.get('/negocios/:id_negocio/dispositivos', authController.listarDispositivos);
+authRoutes.get('/auth/negocios/:id_negocio/dispositivos', authController.listarDispositivos);
 authRoutes.delete('/negocios/:id_negocio/dispositivos/:id_dispositivo', authController.eliminarDispositivo);
+authRoutes.delete('/auth/negocios/:id_negocio/dispositivos/:id_dispositivo', authController.eliminarDispositivo);

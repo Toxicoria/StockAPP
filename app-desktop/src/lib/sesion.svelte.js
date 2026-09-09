@@ -141,10 +141,17 @@ export function refrescar() {
     try {
       const refreshToken = localStorage.getItem(CLAVE_REFRESH);
       if (!refreshToken) return false;
+      const deviceId = obtenerDeviceId();
+      const nombreDev = `PC (${typeof navigator !== 'undefined' && navigator.platform ? navigator.platform : 'Desktop'})`;
       const resp = await fetch(`${BASE_API}/api/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+          device_id: deviceId,
+          nombre_dispositivo: nombreDev,
+          tipo_dispositivo: 'desktop',
+        }),
       });
       if (!resp.ok) {
         limpiar();

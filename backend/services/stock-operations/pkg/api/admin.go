@@ -26,7 +26,9 @@ type negocioAdminItem struct {
 	NombreUsuario  string `json:"nombre_usuario"`
 	Usuario        string `json:"usuario"`
 	EmailUsuario   string `json:"email_usuario"`
-	PerfilCompleto bool   `json:"perfil_completo"`
+	PerfilCompleto  bool   `json:"perfil_completo"`
+	MaxDispositivos int    `json:"max_dispositivos"`
+	TSAuthKey       string `json:"ts_auth_key"`
 }
 
 type reqAdminLogin struct {
@@ -101,7 +103,9 @@ func adminListarNegociosHandler(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(u.id_usuario, 0),
 		       COALESCE(u.nombre, ''),
 		       COALESCE(u.usuario, ''),
-		       COALESCE(u.email, '')
+		       COALESCE(u.email, ''),
+		       COALESCE(n.max_dispositivos, 4),
+		       COALESCE(n.ts_auth_key, '')
 		  FROM negocios n
 		  LEFT JOIN usuarios u ON u.id_negocio = n.id_negocio AND u.rol = 'dueño'
 		 ORDER BY n.id_negocio DESC
@@ -129,6 +133,8 @@ func adminListarNegociosHandler(w http.ResponseWriter, r *http.Request) {
 			&item.NombreUsuario,
 			&item.Usuario,
 			&item.EmailUsuario,
+			&item.MaxDispositivos,
+			&item.TSAuthKey,
 		); err != nil {
 			logger.Error("admin: error leyendo fila de negocio: %v", err)
 			responderError(w, http.StatusInternalServerError, "error leyendo negocios")

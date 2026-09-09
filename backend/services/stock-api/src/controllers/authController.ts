@@ -26,9 +26,20 @@ export async function login(req: Request, res: Response) {
 }
 
 export async function refresh(req: Request, res: Response) {
-  const refreshToken = req.body?.refresh_token;
+  const {
+    refresh_token: refreshToken,
+    device_id,
+    nombre_dispositivo,
+    tipo_dispositivo,
+  } = req.body ?? {};
   if (!refreshToken) throw new ApiError(400, 'refresh_token is required');
-  res.json(await authService.refresh(refreshToken));
+  res.json(
+    await authService.refresh(refreshToken, {
+      device_id,
+      nombre_dispositivo,
+      tipo_dispositivo,
+    }),
+  );
 }
 
 export async function logout(req: Request, res: Response) {
@@ -63,7 +74,7 @@ function autorizarGestionDispositivos(req: Request, idNegocio: number) {
   } catch {
     throw new ApiError(401, 'invalid or expired token');
   }
-  if (claims?.rol !== 'superadmin' && claims?.negocio !== idNegocio) {
+  if (claims?.rol !== 'superadmin' && Number(claims?.negocio) !== idNegocio) {
     throw new ApiError(403, 'acceso no autorizado para este negocio');
   }
 }
