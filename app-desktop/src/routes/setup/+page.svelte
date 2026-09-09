@@ -1,158 +1,233 @@
 <script>
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { BASE_API } from '$lib/config.js';
+  import { pedirApi } from '$lib/api.js';
+  import { sesion, haySesion, cerrarSesion } from '$lib/sesion.svelte.js';
+  import { agregarToast } from '$lib/toast.svelte.js';
 
-  let paso = $state(1);
-  let enviando = $state(false);
+  let cargandoInicial = $state(true);
+  let guardando = $state(false);
   let error = $state('');
 
-  // Paso 1 — Datos del negocio
+  // Campos del negocio
   let nombreNegocio = $state('');
-  let direccion = $state('');
-  let cuit = $state('');
   let nombreDueno = $state('');
+  let direccion = $state('');
   let telefono = $state('');
   let emailNegocio = $state('');
 
-  // Paso 2 — Cuenta del dueño
-  let emailLogin = $state('');
-  let password = $state('');
-  let passwordConfirm = $state('');
-
-  const paso1Valido = $derived(nombreNegocio.trim() !== '' && nombreDueno.trim() !== '');
-  const paso2Valido = $derived(
-    emailLogin.trim() !== '' &&
-    password.length >= 8 &&
-    password === passwordConfirm
+  const formularioValido = $derived(
+    nombreNegocio.trim() !== '' &&
+    nombreDueno.trim() !== '' &&
+    direccion.trim() !== '' &&
+    telefono.trim() !== ''
   );
 
-  function irAPaso2() {
-    if (!paso1Valido) return;
-    error = '';
-    paso = 2;
-  }
+  onMount(async () => {
+    if (!haySesion()) {
+      await goto('/login');
+      return;
+    }
+
+    try {
+      const datos = await pedirApi('/api/negocio');
+      if (datos) {
+        nombreNegocio = datos.nombre_negocio || '';
+        nombreDueno = datos.nombre_dueno || sesion.nombre || '';
+        direccion = datos.direccion || '';
+        telefono = datos.telefono || '';
+        emailNegocio = datos.email_negocio || '';
+
+        // Si el nombre de negocio era el default generado "Negocio de ...", lo limpiamos para que el usuario ingrese el nombre de fantasía real
+        if (nombreNegocio.startsWith('Negocio de ')) {
+          nombreNegocio = '';
+        }
+
+        // Si ya tenía todo completo, no hace falta que esté acá
+        if (nombreNegocio.trim() && nombreDueno.trim() && direccion.trim() && telefono.trim()) {
+          sesion.perfilCompleto = true;
+          await goto('/');
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Error precargando datos del negocio:', e);
+    } finally {
+      cargandoInicial = false;
+    }
+  });
 
   /** @param {SubmitEvent} ev */
-  async function registrar(ev) {
+  async function guardarConfiguracion(ev) {
     ev.preventDefault();
-    if (!paso2Valido) return;
+    if (!formularioValido) {
+      error = 'Por favor completá los campos obligatorios marcados con asterisco (*).';
+      return;
+    }
 
     error = '';
-    enviando = true;
+    guardando = true;
+
     try {
-      const resp = await fetch(`${BASE_API}/api/registro`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await pedirApi('/api/negocio', {
+        method: 'PUT',
+        body: {
           nombre_negocio: nombreNegocio.trim(),
-          direccion: direccion.trim(),
-          cuit: cuit.trim(),
           nombre_dueno: nombreDueno.trim(),
+          direccion: direccion.trim(),
           telefono: telefono.trim(),
           email_negocio: emailNegocio.trim(),
-          nombre_admin: nombreDueno.trim(),
-          email_admin: emailLogin.trim(),
-          password: password,
-        }),
+        },
       });
-      const datos = await resp.json();
-      if (!resp.ok) throw new Error(datos.error ?? 'no se pudo registrar');
-      await goto('/login');
+
+      sesion.negocio = nombreNegocio.trim();
+      sesion.perfilCompleto = true;
+      agregarToast('¡Negocio configurado con éxito!', 'exito');
+      await goto('/');
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
-      error = mensaje === 'Failed to fetch' ? 'no se pudo conectar con el servidor' : mensaje;
+      error = mensaje || 'No se pudieron guardar los datos del negocio.';
     } finally {
-      enviando = false;
+      guardando = false;
     }
   }
 </script>
 
 <div class="centro">
-  <div class="card elev-sm tarjeta">
-    <!-- Indicador de pasos -->
-    <div class="pasos">
-      <div class="paso-indicador" class:activo={paso >= 1}>
-        <span class="paso-num">1</span>
-        <span class="paso-label">Negocio</span>
+  <div class="card elev-sm tarjeta-setup">
+    {#if cargandoInicial}
+      <div class="cargando-box">
+        <svg class="anim-girar" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+        <span class="text-muted">Cargando configuración...</span>
       </div>
-      <div class="paso-linea" class:activo={paso >= 2}></div>
-      <div class="paso-indicador" class:activo={paso >= 2}>
-        <span class="paso-num">2</span>
-        <span class="paso-label">Cuenta</span>
-      </div>
-    </div>
-
-    {#if paso === 1}
-      <div class="cabecera">
-        <h2>Tu negocio</h2>
-        <p class="text-muted">Contanos sobre tu negocio para configurar el sistema.</p>
-      </div>
-
-      <div class="field">
-        <label for="nombre_negocio">Nombre del negocio *</label>
-        <input id="nombre_negocio" class="input" type="text" bind:value={nombreNegocio} placeholder="Ej: Almacén Don Pedro" required />
-      </div>
-      <div class="field">
-        <label for="nombre_dueno">Nombre del dueño/a *</label>
-        <input id="nombre_dueno" class="input" type="text" bind:value={nombreDueno} placeholder="Ej: Pedro García" required />
-      </div>
-      <div class="field">
-        <label for="direccion">Dirección</label>
-        <input id="direccion" class="input" type="text" bind:value={direccion} placeholder="Ej: Av. San Martín 1234" />
-      </div>
-      <div class="fila-doble">
-        <div class="field">
-          <label for="cuit">CUIT</label>
-          <input id="cuit" class="input" type="text" bind:value={cuit} placeholder="20-12345678-9" />
-        </div>
-        <div class="field">
-          <label for="telefono">Teléfono</label>
-          <input id="telefono" class="input" type="tel" bind:value={telefono} placeholder="Ej: 2944-123456" />
-        </div>
-      </div>
-      <div class="field">
-        <label for="email_negocio">Email del negocio</label>
-        <input id="email_negocio" class="input" type="email" bind:value={emailNegocio} placeholder="contacto@minegocio.com" />
-      </div>
-
-      <button class="btn btn-primary btn-block boton-grande" disabled={!paso1Valido} onclick={irAPaso2}>
-        Siguiente →
-      </button>
     {:else}
       <div class="cabecera">
-        <h2>Tu cuenta</h2>
-        <p class="text-muted">Creá tu usuario para acceder al sistema.</p>
+        <div class="icono-box">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"></path>
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+            <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"></path>
+            <path d="M2 7h20"></path>
+          </svg>
+        </div>
+        <div class="titulos">
+          <h2>Configuración Inicial de tu Negocio</h2>
+          <p class="text-muted">Completá los datos comerciales y de contacto para comenzar a operar con StockAPP.</p>
+        </div>
       </div>
 
-      <form onsubmit={registrar}>
-        <div class="campos-paso2">
+      {#if error}
+        <div class="alerta-error">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>{error}</span>
+        </div>
+      {/if}
+
+      <form onsubmit={guardarConfiguracion} class="formulario">
+        <div class="field">
+          <label for="nombre_negocio">Nombre de fantasía / del negocio *</label>
+          <input
+            id="nombre_negocio"
+            class="input"
+            type="text"
+            bind:value={nombreNegocio}
+            placeholder="Ej: Kiosco Don Pedro"
+            required
+          />
+          <small class="hint">Es el nombre visible en la barra de título, tickets y reportes.</small>
+        </div>
+
+        <div class="field">
+          <label for="nombre_dueno">Nombre del dueño/a o responsable *</label>
+          <input
+            id="nombre_dueno"
+            class="input"
+            type="text"
+            bind:value={nombreDueno}
+            placeholder="Ej: Pedro García"
+            required
+          />
+        </div>
+
+        <div class="fila-doble">
           <div class="field">
-            <label for="email_login">Email para iniciar sesión *</label>
-            <input id="email_login" class="input" type="email" bind:value={emailLogin} autocomplete="email" required />
+            <label for="direccion">Dirección comercial *</label>
+            <input
+              id="direccion"
+              class="input"
+              type="text"
+              bind:value={direccion}
+              placeholder="Ej: Av. San Martín 1234"
+              required
+            />
           </div>
+
           <div class="field">
-            <label for="pass">Contraseña * <span class="text-muted">(mínimo 8 caracteres)</span></label>
-            <input id="pass" class="input" type="password" bind:value={password} autocomplete="new-password" required />
-          </div>
-          <div class="field">
-            <label for="pass_confirm">Confirmar contraseña *</label>
-            <input id="pass_confirm" class="input" type="password" bind:value={passwordConfirm} autocomplete="new-password" required />
-            {#if passwordConfirm && password !== passwordConfirm}
-              <span class="error-inline">Las contraseñas no coinciden</span>
-            {/if}
+            <label for="telefono">Teléfono de contacto *</label>
+            <input
+              id="telefono"
+              class="input"
+              type="text"
+              bind:value={telefono}
+              placeholder="Ej: 2966-456789"
+              required
+            />
           </div>
         </div>
 
-        {#if error}
-          <p class="error">{error}</p>
-        {/if}
+        <div class="field">
+          <label for="email_negocio">Correo electrónico del negocio <span class="opcional">(opcional)</span></label>
+          <input
+            id="email_negocio"
+            class="input"
+            type="email"
+            bind:value={emailNegocio}
+            placeholder="Ej: contacto@kioscodonpedro.com"
+          />
+        </div>
+
+        <div class="info-nota">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>Los datos de facturación electrónica y AFIP se podrán configurar más adelante desde el menú de Configuración.</span>
+        </div>
 
         <div class="acciones">
-          <button type="button" class="btn btn-secondary" onclick={() => { paso = 1; error = ''; }}>
-            ← Volver
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick={async () => {
+              await cerrarSesion();
+              await goto('/login');
+            }}
+          >
+            Cerrar sesión
           </button>
-          <button type="submit" class="btn btn-primary boton-registrar" disabled={enviando || !paso2Valido}>
-            {enviando ? 'Creando…' : 'Crear negocio'}
+          <button
+            type="submit"
+            class="btn btn-primary btn-guardar"
+            disabled={guardando || !formularioValido}
+          >
+            {#if guardando}
+              <svg class="anim-girar" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+              </svg>
+              <span>Guardando configuración...</span>
+            {:else}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>Guardar y Comenzar</span>
+            {/if}
           </button>
         </div>
       </form>
@@ -165,67 +240,91 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100%;
-    padding: var(--space-5);
+    min-height: calc(100vh - 40px);
+    padding: var(--space-4);
+    background: var(--color-bg);
   }
-  .tarjeta {
-    width: min(480px, 100%);
-    gap: var(--space-3);
-    padding: var(--space-6);
-  }
-  .cabecera {
-    text-align: center;
-    margin-bottom: var(--space-2);
-  }
-  .cabecera h2 { margin: 0 0 6px; }
-  .cabecera p { margin: 0; font-size: 13px; }
 
-  /* Indicador de pasos */
-  .pasos {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    margin-bottom: var(--space-3);
+  .tarjeta-setup {
+    width: 100%;
+    max-width: 540px;
+    padding: var(--space-5);
+    background: #fbfcfc;
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
   }
-  .paso-indicador {
+
+  .cargando-box {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    opacity: 0.4;
-    transition: opacity 0.2s;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-6) 0;
   }
-  .paso-indicador.activo { opacity: 1; }
-  .paso-num {
+
+  .cabecera {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  .icono-box {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 50%;
+    background: var(--color-accent-100);
+    border: 1px solid var(--color-accent-300);
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--color-surface);
-    font-size: 12px;
+  }
+
+  .titulos h2 {
+    font-size: 19px;
+    color: var(--color-text);
+    margin: 0 0 4px 0;
+  }
+
+  .titulos p {
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .formulario {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .field label {
+    font-size: 13px;
     font-weight: 600;
     color: var(--color-text);
   }
-  .paso-indicador.activo .paso-num {
-    background: var(--color-accent);
-    color: #fff;
+
+  .opcional {
+    font-weight: 400;
+    color: color-mix(in srgb, var(--color-text) 60%, transparent);
+    font-size: 12px;
   }
-  .paso-label {
-    font-size: 11px;
+
+  .hint {
+    font-size: 11.5px;
     color: color-mix(in srgb, var(--color-text) 60%, transparent);
   }
-  .paso-linea {
-    width: 60px;
-    height: 2px;
-    background: var(--color-divider);
-    margin: 0 var(--space-3);
-    margin-bottom: 18px;
-    transition: background 0.2s;
-  }
-  .paso-linea.activo { background: var(--color-accent); }
 
   .fila-doble {
     display: grid;
@@ -233,29 +332,89 @@
     gap: var(--space-3);
   }
 
-  .campos-paso2 {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
+  @media (max-width: 520px) {
+    .fila-doble {
+      grid-template-columns: 1fr;
+    }
   }
 
-  .boton-grande { min-height: 46px; font-size: 15px; margin-top: var(--space-2); }
+  .input {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 13.5px;
+    background: #ffffff;
+    color: var(--color-text);
+    transition: border-color 0.15s ease;
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--color-accent-600);
+  }
+
+  .info-nota {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: 10px 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-divider);
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    color: color-mix(in srgb, var(--color-text) 80%, transparent);
+    line-height: 1.4;
+    margin-top: var(--space-1);
+  }
+
+  .info-nota svg {
+    min-width: 18px;
+    color: var(--color-accent-600);
+    margin-top: 1px;
+  }
+
+  .alerta-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--color-peligro) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-peligro) 30%, transparent);
+    color: var(--color-peligro);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: var(--space-3);
+  }
 
   .acciones {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: var(--space-3);
     margin-top: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-divider);
   }
-  .boton-registrar { flex: 1; min-height: 46px; font-size: 15px; }
 
-  .error {
-    margin: 0;
-    font-size: 13px;
-    color: var(--color-peligro);
+  .btn-guardar {
+    height: 42px;
+    padding: 0 22px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
-  .error-inline {
-    font-size: 12px;
-    color: var(--color-peligro);
+
+  .anim-girar {
+    animation: girar 1s linear infinite;
+  }
+
+  @keyframes girar {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>

@@ -135,8 +135,12 @@ func adminListarNegociosHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Consideramos perfil completo si tiene dirección/CUIT o email cargado
-		item.PerfilCompleto = (item.CUIT != "" || item.EmailNegocio != "" || item.EmailUsuario != "")
+		// Consideramos perfil completo si completó los datos esenciales del negocio (fantasía, dueño, dirección y teléfono)
+		item.PerfilCompleto = (strings.TrimSpace(item.NombreNegocio) != "" &&
+			!strings.HasPrefix(item.NombreNegocio, "Negocio de ") &&
+			strings.TrimSpace(item.NombreDueno) != "" &&
+			strings.TrimSpace(item.Direccion) != "" &&
+			strings.TrimSpace(item.Telefono) != "")
 		negocios = append(negocios, item)
 	}
 

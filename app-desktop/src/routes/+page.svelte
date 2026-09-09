@@ -13,6 +13,10 @@
 
   $effect(() => {
     if (!haySesion()) return;
+    if (esDueno() && !sesion.perfilCompleto) {
+      goto('/setup');
+      return;
+    }
     if (tienePermiso('stock')) {
       pedirApi('/api/stock')
         .then((/** @type {any[]} */ items) => {

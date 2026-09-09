@@ -6,6 +6,8 @@
   import {
     iniciarSesion,
     haySesion,
+    esDueno,
+    sesion,
     obtenerUsuariosRecientes,
     eliminarUsuarioReciente,
   } from '$lib/sesion.svelte.js';
@@ -67,7 +69,13 @@
   }
 
   $effect(() => {
-    if (haySesion()) goto('/');
+    if (haySesion()) {
+      if (esDueno() && !sesion.perfilCompleto) {
+        goto('/setup');
+      } else {
+        goto('/');
+      }
+    }
   });
 
   const usuariosVisibles = $derived(
@@ -179,7 +187,11 @@
     entrando = true;
     try {
       await iniciarSesion(email, password, recordarPassword);
-      await goto('/');
+      if (esDueno() && !sesion.perfilCompleto) {
+        await goto('/setup');
+      } else {
+        await goto('/');
+      }
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
       const esErrorRed = mensaje === 'Failed to fetch' || mensaje === 'Load failed' || mensaje.toLowerCase().includes('fetch');

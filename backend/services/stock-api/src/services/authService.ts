@@ -11,6 +11,10 @@ interface UserRow {
   password_hash: string;
   rol: string;
   permisos: any;
+  nombre_negocio?: string;
+  direccion?: string;
+  telefono?: string;
+  nombre_dueno?: string;
 }
 
 async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string) {
@@ -23,14 +27,36 @@ async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string)
     [user.id_usuario, hashToken(refresh_token), device, expiresAt],
   );
 
-  return { access_token, refresh_token, nombre: user.nombre, rol: user.rol, permisos: user.permisos };
+  const perfilCompleto = Boolean(
+    user.nombre_negocio?.trim() &&
+    !user.nombre_negocio.startsWith('Negocio de ') &&
+    user.direccion?.trim() &&
+    user.telefono?.trim() &&
+    user.nombre_dueno?.trim()
+  );
+
+  return {
+    access_token,
+    refresh_token,
+    nombre: user.nombre,
+    rol: user.rol,
+    permisos: user.permisos,
+    nombre_negocio: user.nombre_negocio || '',
+    perfil_completo: perfilCompleto,
+  };
 }
 
 export async function login(identificador: string, password: string, device: string) {
   const { rows } = await pool.query<UserRow>(
-    `SELECT id_usuario, id_negocio, nombre, password_hash, rol, COALESCE(permisos, '["vender", "stock"]'::jsonb) as permisos
-       FROM usuarios
-      WHERE LOWER(usuario) = LOWER($1) OR LOWER(email) = LOWER($1)`,
+    `SELECT u.id_usuario, u.id_negocio, u.nombre, u.password_hash, u.rol,
+            COALESCE(u.permisos, '["vender", "stock"]'::jsonb) as permisos,
+            COALESCE(n.nombre_negocio, '') as nombre_negocio,
+            COALESCE(n.direccion, '') as direccion,
+            COALESCE(n.telefono, '') as telefono,
+            COALESCE(n.nombre_dueno, '') as nombre_dueno
+       FROM usuarios u
+       LEFT JOIN negocios n ON n.id_negocio = u.id_negocio
+      WHERE LOWER(u.usuario) = LOWER($1) OR LOWER(u.email) = LOWER($1)`,
     [identificador],
   );
 
@@ -43,9 +69,15 @@ export async function login(identificador: string, password: string, device: str
 
 export async function refresh(refreshToken: string) {
   const { rows } = await pool.query(
-    `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio, u.nombre, u.rol, COALESCE(u.permisos, '["vender", "stock"]'::jsonb) as permisos
+    `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio, u.nombre, u.rol,
+            COALESCE(u.permisos, '["vender", "stock"]'::jsonb) as permisos,
+            COALESCE(n.nombre_negocio, '') as nombre_negocio,
+            COALESCE(n.direccion, '') as direccion,
+            COALESCE(n.telefono, '') as telefono,
+            COALESCE(n.nombre_dueno, '') as nombre_dueno
        FROM refresh_tokens rt
        JOIN usuarios u ON u.id_usuario = rt.id_usuario
+       LEFT JOIN negocios n ON n.id_negocio = u.id_negocio
       WHERE rt.token_hash = $1`,
     [hashToken(refreshToken)],
   );

@@ -13,6 +13,7 @@ export const sesion = $state({
   permisos: ['vender', 'stock'],
   accessToken: '',
   negocio: '', // nombre del negocio, para la barra de título
+  perfilCompleto: true,
 });
 
 export function esDueno() {
@@ -74,12 +75,14 @@ export function eliminarUsuarioReciente(email) {
   localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(lista));
 }
 
-/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string, permisos?: string[] }} datos */
+/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string, permisos?: string[], nombre_negocio?: string, perfil_completo?: boolean }} datos */
 function guardarTokens(datos) {
   sesion.accessToken = datos.access_token;
   sesion.nombre = datos.nombre;
   sesion.rol = datos.rol;
   sesion.permisos = Array.isArray(datos.permisos) ? datos.permisos : ['vender', 'stock'];
+  sesion.negocio = datos.nombre_negocio || '';
+  sesion.perfilCompleto = datos.perfil_completo ?? true;
   localStorage.setItem(CLAVE_REFRESH, datos.refresh_token);
 }
 
@@ -88,6 +91,8 @@ function limpiar() {
   sesion.nombre = '';
   sesion.rol = '';
   sesion.permisos = ['vender', 'stock'];
+  sesion.negocio = '';
+  sesion.perfilCompleto = true;
   localStorage.removeItem(CLAVE_REFRESH);
 }
 

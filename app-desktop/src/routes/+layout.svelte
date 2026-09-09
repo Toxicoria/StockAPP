@@ -52,23 +52,12 @@
         return;
       }
 
-      // ¿Hay un negocio registrado?
-      const resp = await fetch(`${BASE_API}/api/registro`);
-      if (resp.ok) {
-        const datos = await resp.json();
-        if (!datos.registrado) {
-          await goto('/setup');
-          restaurando = false;
-          return;
-        }
-      }
-
-      // Hay negocio: al arrancar la app siempre mostramos la pantalla de inicio de sesión (/login)
+      // Al arrancar la app siempre mostramos la pantalla de inicio de sesión (/login)
       if (window.location.pathname !== '/login') {
         await goto('/login');
       }
     } catch (e) {
-      console.warn('Error conectando a la API al iniciar:', e);
+      console.warn('Error inicializando navegación:', e);
       if (window.location.pathname !== '/login') {
         await goto('/login');
       }
