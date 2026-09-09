@@ -3,6 +3,7 @@
   import { sesion, esDueno, haySesion, tienePermiso, cerrarSesion } from '$lib/sesion.svelte.js';
   import { pedirApi } from '$lib/api.js';
   import ModalConfirmacion from '$lib/componentes/ModalConfirmacion.svelte';
+  import ModalVincularCelular from '$lib/componentes/ModalVincularCelular.svelte';
   import {
     estadoConfirmacion,
     solicitarCerrarSesion,
@@ -10,6 +11,7 @@
   } from '$lib/confirmacion.svelte.js';
 
   let alertas = $state(0);
+  let modalCelularAbierto = $state(false);
 
   $effect(() => {
     if (!haySesion()) return;
@@ -116,6 +118,17 @@
         <span class="text-muted detalle">Datos del negocio y clave fiscal de ARCA.</span>
       </button>
     {/if}
+
+    {#if esDueno()}
+      <button class="accion" onclick={() => (modalCelularAbierto = true)}>
+        <span class="fila">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+          <span class="tag tag-accent">En vivo</span>
+        </span>
+        <span class="nombre">Control Móvil</span>
+        <span class="text-muted detalle">Escanear código QR para monitorear caja y ventas desde tu celular.</span>
+      </button>
+    {/if}
   </div>
 
   <div class="pie">
@@ -134,6 +147,8 @@
   onconfirmar={ejecutarCerrarSesion}
   oncancelar={cancelarCerrarSesion}
 />
+
+<ModalVincularCelular bind:abierto={modalCelularAbierto} />
 
 <style>
   .hub { max-width: 980px; margin: 0 auto; }

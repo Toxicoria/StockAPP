@@ -15,9 +15,90 @@ interface UserRow {
   direccion?: string;
   telefono?: string;
   nombre_dueno?: string;
+  max_dispositivos?: number;
+  ts_auth_key?: string;
 }
 
-async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string) {
+export interface DeviceInfo {
+  device_id?: string;
+  nombre_dispositivo?: string;
+  tipo_dispositivo?: 'desktop' | 'mobile';
+}
+
+export async function asegurarTailscaleKey(
+  idNegocio: number,
+  nombreNegocio: string,
+  currentKey?: string,
+): Promise<string> {
+  if (currentKey && currentKey.trim()) return currentKey.trim();
+  const newKey = await generarAuthKeyTailscale(nombreNegocio || 'Negocio');
+  await pool.query(`UPDATE negocios SET ts_auth_key = $1 WHERE id_negocio = $2`, [newKey, idNegocio]);
+  return newKey;
+}
+
+export async function registrarOVerificarDispositivo(
+  idNegocio: number,
+  maxDispositivos: number,
+  deviceInfo?: DeviceInfo,
+) {
+  if (!deviceInfo || !deviceInfo.device_id) return;
+
+  const devId = deviceInfo.device_id.trim();
+  const nombreDev =
+    deviceInfo.nombre_dispositivo?.trim() ||
+    (deviceInfo.tipo_dispositivo === 'mobile' ? 'Celular Móvil' : 'PC Desktop');
+  const tipoDev = deviceInfo.tipo_dispositivo || 'desktop';
+
+  // 1. Verificar si ya existe este dispositivo para este negocio
+  const { rows: devRows } = await pool.query<{ id_dispositivo: number; activo: boolean }>(
+    `SELECT id_dispositivo, activo FROM dispositivos_cliente WHERE id_negocio = $1 AND device_id = $2`,
+    [idNegocio, devId],
+  );
+
+  if (devRows.length > 0) {
+    const dev = devRows[0];
+    if (!dev.activo) {
+      throw new ApiError(403, 'Este dispositivo ha sido desvinculado por el administrador');
+    }
+    // Actualizar última conexión y nombre
+    await pool.query(
+      `UPDATE dispositivos_cliente
+          SET ultima_conexion = CURRENT_TIMESTAMP,
+              nombre_dispositivo = COALESCE(NULLIF($1, ''), nombre_dispositivo)
+        WHERE id_dispositivo = $2`,
+      [nombreDev, dev.id_dispositivo],
+    );
+  } else {
+    // Es un dispositivo nuevo: verificar cuántos activos hay simultáneamente
+    const { rows: countRows } = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM dispositivos_cliente WHERE id_negocio = $1 AND activo = true`,
+      [idNegocio],
+    );
+    const activeCount = parseInt(countRows[0]?.count || '0', 10);
+    const limite = maxDispositivos || 4;
+
+    if (activeCount >= limite) {
+      throw new ApiError(
+        403,
+        `Límite de ${limite} equipos simultáneos alcanzado para este comercio. Podés desvincular un equipo desde el panel de administración.`,
+      );
+    }
+
+    // Registrar nuevo dispositivo
+    await pool.query(
+      `INSERT INTO dispositivos_cliente (id_negocio, device_id, nombre_dispositivo, tipo_dispositivo, activo)
+       VALUES ($1, $2, $3, $4, true)`,
+      [idNegocio, devId, nombreDev, tipoDev],
+    );
+  }
+}
+
+export async function issueTokens(
+  user: Omit<UserRow, 'password_hash'>,
+  device: string,
+  deviceInfo?: DeviceInfo,
+  tsAuthKey?: string,
+) {
   const access_token = signAccessToken(user);
   const { token: refresh_token, expiresAt } = newRefreshToken();
 
@@ -43,17 +124,26 @@ async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string)
     permisos: user.permisos,
     nombre_negocio: user.nombre_negocio || '',
     perfil_completo: perfilCompleto,
+    ts_auth_key: tsAuthKey || user.ts_auth_key || '',
+    device_id: deviceInfo?.device_id || '',
   };
 }
 
-export async function login(identificador: string, password: string, device: string) {
+export async function login(
+  identificador: string,
+  password: string,
+  device: string,
+  deviceInfo?: DeviceInfo,
+) {
   const { rows } = await pool.query<UserRow>(
     `SELECT u.id_usuario, u.id_negocio, u.nombre, u.password_hash, u.rol,
             COALESCE(u.permisos, '["vender", "stock"]'::jsonb) as permisos,
             COALESCE(n.nombre_negocio, '') as nombre_negocio,
             COALESCE(n.direccion, '') as direccion,
             COALESCE(n.telefono, '') as telefono,
-            COALESCE(n.nombre_dueno, '') as nombre_dueno
+            COALESCE(n.nombre_dueno, '') as nombre_dueno,
+            COALESCE(n.max_dispositivos, 4) as max_dispositivos,
+            COALESCE(n.ts_auth_key, '') as ts_auth_key
        FROM usuarios u
        LEFT JOIN negocios n ON n.id_negocio = u.id_negocio
       WHERE LOWER(u.usuario) = LOWER($1) OR LOWER(u.email) = LOWER($1)`,
@@ -64,7 +154,20 @@ export async function login(identificador: string, password: string, device: str
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     throw new ApiError(401, 'usuario o contraseña incorrectos');
   }
-  return issueTokens(user, device);
+
+  // 1. Control de dispositivos simultáneos
+  if (deviceInfo?.device_id) {
+    await registrarOVerificarDispositivo(user.id_negocio, user.max_dispositivos || 4, deviceInfo);
+  }
+
+  // 2. Clave Tailscale para el negocio
+  const tsAuthKey = await asegurarTailscaleKey(
+    user.id_negocio,
+    user.nombre_negocio || 'Negocio',
+    user.ts_auth_key,
+  );
+
+  return issueTokens(user, device, deviceInfo, tsAuthKey);
 }
 
 export async function refresh(refreshToken: string) {
@@ -74,7 +177,9 @@ export async function refresh(refreshToken: string) {
             COALESCE(n.nombre_negocio, '') as nombre_negocio,
             COALESCE(n.direccion, '') as direccion,
             COALESCE(n.telefono, '') as telefono,
-            COALESCE(n.nombre_dueno, '') as nombre_dueno
+            COALESCE(n.nombre_dueno, '') as nombre_dueno,
+            COALESCE(n.max_dispositivos, 4) as max_dispositivos,
+            COALESCE(n.ts_auth_key, '') as ts_auth_key
        FROM refresh_tokens rt
        JOIN usuarios u ON u.id_usuario = rt.id_usuario
        LEFT JOIN negocios n ON n.id_negocio = u.id_negocio
@@ -89,7 +194,7 @@ export async function refresh(refreshToken: string) {
   if (new Date(row.expira_en).getTime() < Date.now()) {
     throw new ApiError(401, 'session expired, please log in again');
   }
-  return issueTokens(row, row.dispositivo ?? '');
+  return issueTokens(row, row.dispositivo ?? '', undefined, row.ts_auth_key);
 }
 
 export async function logout(refreshToken: string) {

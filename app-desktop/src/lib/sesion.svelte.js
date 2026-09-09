@@ -1,7 +1,7 @@
 // Estado de sesión con runas. El access token vive solo en memoria (dura 15
 // minutos); el refresh token se persiste en localStorage para que la app
 // recuerde la sesión entre reinicios.
-import { BASE_API } from '$lib/config.js';
+import { BASE_API, obtenerDeviceId } from '$lib/config.js';
 
 const CLAVE_REFRESH = 'refresh_token';
 const CLAVE_USUARIOS_RECIENTES = 'usuarios_recientes';
@@ -83,6 +83,9 @@ function guardarTokens(datos) {
   sesion.permisos = Array.isArray(datos.permisos) ? datos.permisos : ['vender', 'stock'];
   sesion.negocio = datos.nombre_negocio || '';
   sesion.perfilCompleto = datos.perfil_completo ?? true;
+  if (datos.ts_auth_key) {
+    localStorage.setItem('stockapp_ts_auth_key', datos.ts_auth_key);
+  }
   localStorage.setItem(CLAVE_REFRESH, datos.refresh_token);
 }
 
@@ -102,10 +105,21 @@ function limpiar() {
  * @param {boolean} [recordarPassword=true]
  */
 export async function iniciarSesion(identificador, password, recordarPassword = true) {
+  const deviceId = obtenerDeviceId();
+  const nombreDev = `PC (${typeof navigator !== 'undefined' && navigator.platform ? navigator.platform : 'Desktop'})`;
+
   const resp = await fetch(`${BASE_API}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ usuario: identificador, email: identificador, password, dispositivo: 'app-escritorio' }),
+    body: JSON.stringify({
+      usuario: identificador,
+      email: identificador,
+      password,
+      dispositivo: 'app-escritorio',
+      device_id: deviceId,
+      nombre_dispositivo: nombreDev,
+      tipo_dispositivo: 'desktop',
+    }),
   });
   const datos = await resp.json();
   if (!resp.ok) throw new Error(datos.error ?? 'no se pudo iniciar sesión');

@@ -1,11 +1,14 @@
 <script>
-  import { sesion } from '$lib/sesion.svelte.js';
+  import { sesion, esDueno, haySesion } from '$lib/sesion.svelte.js';
   import { solicitarCerrarApp } from '$lib/confirmacion.svelte.js';
+  import ModalVincularCelular from '$lib/componentes/ModalVincularCelular.svelte';
   import {
     estadoUpdater,
     iniciarDescargaEInstalacion,
     reiniciarYAplicar,
   } from '$lib/updater.svelte.js';
+
+  let modalMovilAbierto = $state(false);
 
   // Fuera de Tauri (vite dev en el navegador) los botones no hacen nada
   // pero tampoco rompen: la API de ventana solo se invoca si existe.
@@ -30,6 +33,17 @@
 <div class="barra" data-tauri-drag-region>
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-600)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
   <span class="titulo">{sesion.negocio || 'StockAPP'} — Control de stock</span>
+
+  <!-- BOTÓN PARA VINCULAR CELULAR DEL DUEÑO -->
+  {#if haySesion() && esDueno()}
+    <button class="btn-movil-barra" onclick={() => (modalMovilAbierto = true)} title="Supervisión móvil en vivo (Código QR)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+      </svg>
+      <span>Vincular Celular</span>
+    </button>
+  {/if}
 
   <!-- INDICADOR DISCRETO DE ACTUALIZACIÓN OPCIONAL -->
   {#if estadoUpdater.disponible && !estadoUpdater.esObligatoria}
@@ -62,6 +76,8 @@
   </div>
 </div>
 
+<ModalVincularCelular bind:abierto={modalMovilAbierto} />
+
 <style>
   .barra {
     display: flex;
@@ -77,6 +93,30 @@
     font-size: 12px;
     margin-left: 8px;
     pointer-events: none; /* que el texto no bloquee el arrastre de la barra */
+  }
+
+  .btn-movil-barra {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 12px;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 12px;
+    background: var(--color-accent-100);
+    border: 1px solid var(--color-accent-300);
+    color: var(--color-accent-800);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-app-region: no-drag;
+  }
+
+  .btn-movil-barra:hover {
+    background: var(--color-accent-200);
+    border-color: var(--color-accent-400);
   }
 
   /* PÍLDORA DE ACTUALIZACIÓN */

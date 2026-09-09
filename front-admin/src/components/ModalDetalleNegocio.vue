@@ -51,6 +51,25 @@ async function eliminarDispositivo(idDispositivo: number) {
   }
 }
 
+const copiadoTs = ref(false);
+
+function formatearFecha(f?: string | null): string {
+  if (!f) return 'Reciente';
+  try {
+    const d = new Date(f);
+    return d.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return String(f);
+  }
+}
+
+function copiarTexto(txt?: string) {
+  if (!txt) return;
+  navigator.clipboard.writeText(txt);
+  copiadoTs.value = true;
+  setTimeout(() => (copiadoTs.value = false), 2000);
+}
+
 const mostrandoConfirmacion = ref(false);
 const cargando = ref(false);
 const error = ref('');
@@ -273,11 +292,25 @@ async function guardarCambios() {
             <div v-else class="lista-dispositivos">
               <div v-for="dev in dispositivos" :key="dev.id_dispositivo" class="item-dispositivo">
                 <div class="info-dev">
-                  <span class="nombre-dev">💻 {{ dev.nombre_dispositivo }}</span>
-                  <span class="meta-dev">ID: {{ dev.device_id }} · Registrado: {{ dev.fecha_registro?.substring(0, 10) || 'Hoy' }}</span>
+                  <span class="nombre-dev">
+                    {{ dev.tipo_dispositivo === 'mobile' ? '📱' : '💻' }} {{ dev.nombre_dispositivo }}
+                    <span v-if="dev.tipo_dispositivo === 'mobile'" class="tag-mobile">Supervisor Móvil</span>
+                  </span>
+                  <span class="meta-dev">ID: {{ dev.device_id }} · Conexión: {{ formatearFecha(dev.ultima_conexion) }}</span>
                 </div>
                 <button type="button" class="btn-desvincular" @click="eliminarDispositivo(dev.id_dispositivo)">
                   🗑️ Desvincular
+                </button>
+              </div>
+            </div>
+
+            <!-- CLAVE TAILSCALE DEL NEGOCIO -->
+            <div v-if="negocio.ts_auth_key" class="ts-key-box">
+              <span class="lbl-ts">Clave de Red (Tailscale Auth Key):</span>
+              <div class="key-row">
+                <code>{{ negocio.ts_auth_key }}</code>
+                <button type="button" class="btn-copiar-ts" @click="copiarTexto(negocio.ts_auth_key)">
+                  {{ copiadoTs ? '¡Copiado!' : 'Copiar Clave' }}
                 </button>
               </div>
             </div>
@@ -531,6 +564,68 @@ async function guardarCambios() {
 
 .btn-desvincular:hover {
   background: rgba(239, 68, 68, 0.25);
+}
+
+.tag-mobile {
+  background: rgba(46, 110, 115, 0.15);
+  color: #2e6e73;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+.ts-key-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm, 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lbl-ts {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.key-row code {
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 3px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 75%;
+}
+
+.btn-copiar-ts {
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.btn-copiar-ts:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 </style>
 

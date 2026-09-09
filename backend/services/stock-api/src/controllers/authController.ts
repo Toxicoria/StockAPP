@@ -4,10 +4,25 @@ import * as authService from '../services/authService.js';
 import { verifyAccessToken } from '../services/tokenService.js';
 
 export async function login(req: Request, res: Response) {
-  const { usuario, email, identificador, password, dispositivo = '' } = req.body ?? {};
+  const {
+    usuario,
+    email,
+    identificador,
+    password,
+    dispositivo = '',
+    device_id,
+    nombre_dispositivo,
+    tipo_dispositivo,
+  } = req.body ?? {};
   const loginHandle = usuario || identificador || email;
   if (!loginHandle || !password) throw new ApiError(400, 'usuario y contraseña son obligatorios');
-  res.json(await authService.login(loginHandle, password, dispositivo));
+  res.json(
+    await authService.login(loginHandle, password, dispositivo, {
+      device_id,
+      nombre_dispositivo,
+      tipo_dispositivo,
+    }),
+  );
 }
 
 export async function refresh(req: Request, res: Response) {
