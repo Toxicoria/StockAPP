@@ -14,6 +14,20 @@ on:
 jobs:
   construir-y-probar:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: admin_dev
+          POSTGRES_PASSWORD: password_dev
+          POSTGRES_DB: stock_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U admin_dev -d stock_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: 📥 Clonar el repositorio
         uses: actions/checkout@v4
@@ -28,9 +42,12 @@ jobs:
 
       - name: 📦 Verificar stock-operations (Go)
         working-directory: ./backend/services/stock-operations
+        env:
+          TEST_DATABASE_URL: postgresql://admin_dev:password_dev@localhost:5432/stock_db?sslmode=disable
         run: |
           go build -v ./...
           go vet ./...
+          go test -tags=integration ./...
 
       - name: 👻 Verificar Cliente Sidecar
         working-directory: ./cliente-sidecar
@@ -48,3 +65,4 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run check
+          npm test

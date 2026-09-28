@@ -62,11 +62,12 @@ export function eliminarUsuarioReciente(email) {
   localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(lista));
 }
 
-/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string }} datos */
+/** @param {{ access_token: string, refresh_token: string, nombre: string, rol: string, negocio: string }} datos */
 function guardarTokens(datos) {
   sesion.accessToken = datos.access_token;
   sesion.nombre = datos.nombre;
   sesion.rol = datos.rol;
+  sesion.negocio = datos.negocio;
   localStorage.setItem(CLAVE_REFRESH, datos.refresh_token);
 }
 
@@ -74,6 +75,7 @@ function limpiar() {
   sesion.accessToken = '';
   sesion.nombre = '';
   sesion.rol = '';
+  sesion.negocio = '';
   localStorage.removeItem(CLAVE_REFRESH);
 }
 

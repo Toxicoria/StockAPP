@@ -135,4 +135,8 @@ ALTER TABLE negocios ADD COLUMN IF NOT EXISTS nombre_dueno   VARCHAR(150);
 ALTER TABLE negocios ADD COLUMN IF NOT EXISTS telefono       VARCHAR(50);
 ALTER TABLE negocios ADD COLUMN IF NOT EXISTS email_negocio  VARCHAR(150);
 
+-- Las primeras versiones del onboarding usaban un rol "admin" que ningún
+-- handler reconocía. Normalizar instalaciones creadas con esa versión.
+UPDATE usuarios SET rol = 'dueño' WHERE rol = 'admin';
+
 CREATE INDEX IF NOT EXISTS idx_ventas_negocio_fecha ON ventas (id_negocio, fecha_hora);

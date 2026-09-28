@@ -12,7 +12,7 @@ import (
 )
 
 // cuerpoRegistro contiene los datos del onboarding inicial:
-// crea el primer negocio y su usuario admin de una sola vez.
+// crea el primer negocio y su usuario dueño de una sola vez.
 type cuerpoRegistro struct {
 	// Negocio
 	NombreNegocio string `json:"nombre_negocio"`
@@ -21,13 +21,13 @@ type cuerpoRegistro struct {
 	NombreDueno   string `json:"nombre_dueno"`
 	Telefono      string `json:"telefono"`
 	EmailNegocio  string `json:"email_negocio"`
-	// Admin inicial
+	// Dueño inicial
 	NombreAdmin string `json:"nombre_admin"`
 	EmailAdmin  string `json:"email_admin"`
 	Password    string `json:"password"`
 }
 
-// registroHandler crea un negocio nuevo junto con su primer usuario admin.
+// registroHandler crea un negocio nuevo junto con su primer usuario dueño.
 // Solo funciona si NO existe ningún negocio todavía (primer arranque del servidor).
 // POST /api/registro  — ruta pública, sin autenticación.
 func registroHandler(w http.ResponseWriter, r *http.Request) {
@@ -47,18 +47,6 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verificar que todavía no haya negocios (evita que cualquiera llame a este endpoint en producción)
-	var cantidad int
-	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM negocios`).Scan(&cantidad); err != nil {
-		logger.Error("registro: error chequeando negocios existentes: %v", err)
-		responderError(w, http.StatusInternalServerError, "error al verificar el estado del servidor")
-		return
-	}
-	if cantidad > 0 {
-		responderError(w, http.StatusConflict, "el servidor ya tiene un negocio registrado")
-		return
-	}
-
 	// Hash de la contraseña
 	hash, err := bcrypt.GenerateFromPassword([]byte(cuerpo.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -67,7 +55,9 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insertar negocio y usuario admin en una transacción
+	// Insertar negocio y usuario dueño en una transacción. El advisory lock
+	// serializa intentos concurrentes de bootstrap: solo el primero puede ver
+	// la base vacía y crear el negocio.
 	tx, err := db.DB.Begin()
 	if err != nil {
 		logger.Error("registro: error abriendo transacción: %v", err)
@@ -75,6 +65,23 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+
+	if _, err := tx.Exec(`SELECT pg_advisory_xact_lock(75324001)`); err != nil {
+		logger.Error("registro: error bloqueando el bootstrap: %v", err)
+		responderError(w, http.StatusInternalServerError, "error al verificar el estado del servidor")
+		return
+	}
+
+	var cantidad int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM negocios`).Scan(&cantidad); err != nil {
+		logger.Error("registro: error chequeando negocios existentes: %v", err)
+		responderError(w, http.StatusInternalServerError, "error al verificar el estado del servidor")
+		return
+	}
+	if cantidad > 0 {
+		responderError(w, http.StatusConflict, "el servidor ya tiene un negocio registrado")
+		return
+	}
 
 	var idNegocio int
 	err = tx.QueryRow(
@@ -96,7 +103,7 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = tx.Exec(
 		`INSERT INTO usuarios (id_negocio, nombre, email, password_hash, rol)
-		 VALUES ($1, $2, $3, $4, 'admin')`,
+		 VALUES ($1, $2, $3, $4, 'dueño')`,
 		idNegocio, cuerpo.NombreAdmin, cuerpo.EmailAdmin, string(hash),
 	)
 	if err != nil {
@@ -104,8 +111,8 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 			responderError(w, http.StatusConflict, "ya existe un usuario con ese email")
 			return
 		}
-		logger.Error("registro: error creando usuario admin: %v", err)
-		responderError(w, http.StatusInternalServerError, "no se pudo crear el usuario admin")
+		logger.Error("registro: error creando usuario dueño: %v", err)
+		responderError(w, http.StatusInternalServerError, "no se pudo crear el usuario dueño")
 		return
 	}
 
@@ -115,7 +122,7 @@ func registroHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("registro: nuevo negocio #%d (%s) con admin %s", idNegocio, cuerpo.NombreNegocio, cuerpo.EmailAdmin)
+	logger.Info("registro: nuevo negocio #%d (%s) con dueño %s", idNegocio, cuerpo.NombreNegocio, cuerpo.EmailAdmin)
 	responderJSON(w, http.StatusCreated, map[string]any{
 		"id_negocio":     idNegocio,
 		"nombre_negocio": cuerpo.NombreNegocio,

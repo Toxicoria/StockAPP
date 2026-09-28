@@ -6,6 +6,7 @@ import { hashToken, newRefreshToken, signAccessToken } from './tokenService.js';
 interface UserRow {
   id_usuario: number;
   id_negocio: number;
+  nombre_negocio: string;
   nombre: string;
   password_hash: string;
   rol: string;
@@ -21,14 +22,21 @@ async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string)
     [user.id_usuario, hashToken(refresh_token), device, expiresAt],
   );
 
-  return { access_token, refresh_token, nombre: user.nombre, rol: user.rol };
+  return {
+    access_token,
+    refresh_token,
+    nombre: user.nombre,
+    rol: user.rol,
+    negocio: user.nombre_negocio,
+  };
 }
 
 export async function login(email: string, password: string, device: string) {
   const { rows } = await pool.query<UserRow>(
-    `SELECT id_usuario, id_negocio, nombre, password_hash, rol
-       FROM usuarios
-      WHERE email = $1`,
+    `SELECT u.id_usuario, u.id_negocio, n.nombre_negocio, u.nombre, u.password_hash, u.rol
+       FROM usuarios u
+       JOIN negocios n ON n.id_negocio = u.id_negocio
+      WHERE u.email = $1`,
     [email],
   );
 
@@ -43,9 +51,11 @@ export async function login(email: string, password: string, device: string) {
 
 export async function refresh(refreshToken: string) {
   const { rows } = await pool.query(
-    `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio, u.nombre, u.rol
+    `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio,
+            n.nombre_negocio, u.nombre, u.rol
        FROM refresh_tokens rt
        JOIN usuarios u ON u.id_usuario = rt.id_usuario
+       JOIN negocios n ON n.id_negocio = u.id_negocio
       WHERE rt.token_hash = $1`,
     [hashToken(refreshToken)],
   );
