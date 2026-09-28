@@ -14,15 +14,32 @@ import (
 // La clave fiscal de ARCA (y cualquier otro secreto del negocio) se guarda
 // cifrada, nunca en texto plano — es la credencial de acceso al portal
 // impositivo real del negocio. AES-256-GCM con la clave derivada por SHA-256
-// de CONFIG_SECRET_KEY: así cualquier passphrase sirve como clave de 32
-// bytes, sin exigirle un formato particular (mismo patrón que JWT_SECRET).
-func claveCifrado() [32]byte {
-	return sha256.Sum256([]byte(db.Env("CONFIG_SECRET_KEY", "clave_local_dev_no_usar_en_produccion")))
+// de CONFIG_SECRET_KEY. La frase debe tener al menos 32 caracteres y su hash
+// produce la clave de 32 bytes usada por AES-256.
+func claveCifrado() ([32]byte, error) {
+	secreto, err := db.EnvObligatoria("CONFIG_SECRET_KEY")
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if len(secreto) < 32 {
+		return [32]byte{}, errors.New("CONFIG_SECRET_KEY debe tener al menos 32 caracteres")
+	}
+	return sha256.Sum256([]byte(secreto)), nil
+}
+
+// ValidarConfiguracion permite fallar al iniciar el servicio, antes de aceptar
+// datos que luego no podrían descifrarse con una clave estable.
+func ValidarConfiguracion() error {
+	_, err := claveCifrado()
+	return err
 }
 
 // cifrar devuelve nonce+ciphertext listos para guardar en una columna BYTEA.
 func cifrar(texto string) ([]byte, error) {
-	clave := claveCifrado()
+	clave, err := claveCifrado()
+	if err != nil {
+		return nil, err
+	}
 	bloque, err := aes.NewCipher(clave[:])
 	if err != nil {
 		return nil, err
@@ -41,7 +58,10 @@ func cifrar(texto string) ([]byte, error) {
 // descifrar es de uso interno exclusivo (por ejemplo, el futuro cliente WSAA
 // de ARCA) — nunca se expone el resultado por la API.
 func descifrar(datos []byte) (string, error) {
-	clave := claveCifrado()
+	clave, err := claveCifrado()
+	if err != nil {
+		return "", err
+	}
 	bloque, err := aes.NewCipher(clave[:])
 	if err != nil {
 		return "", err

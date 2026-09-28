@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
-import { createApp } from '../dist/app.js';
 
 let upstream;
 let gateway;
 let baseUrl;
+let createApp;
 const received = [];
 
 function listen(server) {
@@ -20,6 +20,10 @@ function listen(server) {
 }
 
 before(async () => {
+  process.env.DB_PASSWORD = 'test-only-password';
+  process.env.JWT_SECRET = 'test-only-jwt-secret-with-enough-entropy';
+  ({ createApp } = await import('../dist/app.js'));
+
   upstream = createServer((req, res) => {
     received.push({ method: req.method, url: req.url, authorization: req.headers.authorization });
     res.writeHead(req.method === 'POST' ? 201 : 200, { 'Content-Type': 'application/json' });
@@ -67,4 +71,26 @@ test('other proxied routes remain protected', async () => {
 
   assert.equal(response.status, 401);
   assert.equal(received.length, callsBefore);
+});
+
+test('login is limited after ten attempts from the same client', async () => {
+  for (let attempt = 1; attempt <= 10; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(response.status, 400);
+  }
+
+  const blocked = await fetch(`${baseUrl}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(blocked.status, 429);
+  assert.match(blocked.headers.get('ratelimit') ?? '', /r=0/);
+  assert.deepEqual(await blocked.json(), {
+    error: 'demasiados intentos de ingreso; esperá 15 minutos',
+  });
 });

@@ -22,21 +22,44 @@ export function haySesion() {
 }
 
 /**
- * @returns {Array<{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean, ultimaSesion: number }>}
+ * @returns {Array<{ email: string, nombre: string, rol: string, ultimaSesion: number }>}
  */
 export function obtenerUsuariosRecientes() {
   try {
     const raw = localStorage.getItem(CLAVE_USUARIOS_RECIENTES);
     if (!raw) return [];
     const lista = JSON.parse(raw);
-    return Array.isArray(lista) ? lista : [];
+    if (!Array.isArray(lista)) return [];
+
+    // Migración defensiva: versiones anteriores guardaban password en claro.
+    // Al leer la lista se reconstruye únicamente con campos no sensibles y se
+    // sobrescribe inmediatamente el valor persistido.
+    const perfiles = lista
+      .filter((item) => item && typeof item.email === 'string' && item.email !== '')
+      .map((item) => ({
+        email: item.email,
+        nombre: typeof item.nombre === 'string' ? item.nombre : item.email.split('@')[0],
+        rol: typeof item.rol === 'string' ? item.rol : 'cajero',
+        ultimaSesion: typeof item.ultimaSesion === 'number' ? item.ultimaSesion : 0,
+      }));
+    localStorage.setItem(CLAVE_USUARIOS_RECIENTES, JSON.stringify(perfiles));
+    return perfiles;
   } catch {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CLAVE_USUARIOS_RECIENTES);
+    }
     return [];
   }
 }
 
+// Limpiar credenciales persistidas por versiones anteriores apenas carga el
+// módulo, incluso si el usuario todavía conserva una sesión válida.
+if (typeof localStorage !== 'undefined') {
+  obtenerUsuariosRecientes();
+}
+
 /**
- * @param {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean }} u
+ * @param {{ email: string, nombre: string, rol: string }} u
  */
 export function guardarUsuarioReciente(u) {
   if (!u || !u.email) return;
@@ -45,8 +68,6 @@ export function guardarUsuarioReciente(u) {
     email: u.email,
     nombre: u.nombre || u.email.split('@')[0],
     rol: u.rol || 'cajero',
-    password: u.recordarPassword ? (u.password || '') : '',
-    recordarPassword: Boolean(u.recordarPassword),
     ultimaSesion: Date.now(),
   });
   // Mantener como máximo 6 usuarios recientes
@@ -82,9 +103,8 @@ function limpiar() {
 /**
  * @param {string} email
  * @param {string} password
- * @param {boolean} [recordarPassword=true]
  */
-export async function iniciarSesion(email, password, recordarPassword = true) {
+export async function iniciarSesion(email, password) {
   const resp = await fetch(`${BASE_API}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -97,8 +117,6 @@ export async function iniciarSesion(email, password, recordarPassword = true) {
     email,
     nombre: datos.nombre,
     rol: datos.rol,
-    password,
-    recordarPassword,
   });
 }
 

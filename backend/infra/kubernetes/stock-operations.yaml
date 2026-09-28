@@ -25,13 +25,19 @@ spec:
             - name: DB_USER
               value: admin_dev
             - name: DB_PASSWORD
-              value: password_dev
+              valueFrom:
+                secretKeyRef:
+                  name: stockapp-secrets
+                  key: DB_PASSWORD
             - name: DB_NAME
               value: stock_db
             - name: STOCK_API_URL
               value: http://stock-api:3000
             - name: CONFIG_SECRET_KEY
-              value: clave_local_dev_no_usar_en_produccion
+              valueFrom:
+                secretKeyRef:
+                  name: stockapp-secrets
+                  key: CONFIG_SECRET_KEY
           readinessProbe:
             httpGet:
               path: /api/ping

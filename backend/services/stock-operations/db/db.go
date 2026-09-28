@@ -2,8 +2,10 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 
@@ -19,7 +21,11 @@ func Iniciar() {
 	host := Env("DB_HOST", "localhost")
 	port := Env("DB_PORT", "5432")
 	user := Env("DB_USER", "admin_dev")
-	password := Env("DB_PASSWORD", "password_dev")
+	password, err := EnvObligatoria("DB_PASSWORD")
+	if err != nil {
+		logger.Error("Configuración inválida: %v", err)
+		os.Exit(1)
+	}
 	dbname := Env("DB_NAME", "stock_db")
 
 	// El "connection string" es la URL que describe cómo conectarse.
@@ -29,7 +35,6 @@ func Iniciar() {
 		host, port, user, password, dbname,
 	)
 
-	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		logger.Error("Error al configurar la conexión a la DB: %v", err)
@@ -44,9 +49,19 @@ func Iniciar() {
 	logger.OK("Conexión a PostgreSQL establecida.")
 }
 
-// Env lee una variable de entorno y devuelve un valor por defecto si no
-// existe. Esto permite correr el backend tanto en Docker (con variables
-// seteadas) como localmente (con los valores default para desarrollo).
+// EnvObligatoria devuelve una variable sensible o un error. Los secretos no
+// tienen valores por defecto para evitar desplegar accidentalmente claves de
+// desarrollo conocidas.
+func EnvObligatoria(key string) (string, error) {
+	value, exists := os.LookupEnv(key)
+	if !exists || strings.TrimSpace(value) == "" {
+		return "", errors.New("falta la variable de entorno obligatoria " + key)
+	}
+	return value, nil
+}
+
+// Env lee una variable no sensible y devuelve un valor por defecto si no
+// existe.
 func Env(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value

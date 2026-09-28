@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: admin_dev
-      POSTGRES_PASSWORD: password_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en backend/infra/.env}
       POSTGRES_DB: stock_db
     ports:
       - "5432:5432"
@@ -28,10 +28,10 @@ services:
       DB_HOST: postgres_dev
       DB_PORT: "5432"
       DB_USER: admin_dev
-      DB_PASSWORD: password_dev
+      DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en backend/infra/.env}
       DB_NAME: stock_db
       STOCK_API_URL: http://api_ts:3000
-      CONFIG_SECRET_KEY: ${CONFIG_SECRET_KEY:-clave_local_dev_no_usar_en_produccion}
+      CONFIG_SECRET_KEY: ${CONFIG_SECRET_KEY:?definir CONFIG_SECRET_KEY en backend/infra/.env}
 
   # stock-api (TS/Express): usuarios + puerta de entrada (gateway en :3000)
   api_ts:
@@ -48,9 +48,9 @@ services:
       DB_HOST: postgres_dev
       DB_PORT: "5432"
       DB_USER: admin_dev
-      DB_PASSWORD: password_dev
+      DB_PASSWORD: ${DB_PASSWORD:?definir DB_PASSWORD en backend/infra/.env}
       DB_NAME: stock_db
-      JWT_SECRET: ${JWT_SECRET:-secreto_solo_para_desarrollo}
+      JWT_SECRET: ${JWT_SECRET:?definir JWT_SECRET en backend/infra/.env}
       GO_INTERNO: http://api_go:8080
       PUERTO: "3000"
 

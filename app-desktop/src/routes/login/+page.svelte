@@ -11,13 +11,12 @@
 
   let email = $state('');
   let password = $state('');
-  let recordarPassword = $state(true);
   let error = $state('');
   let entrando = $state(false);
 
-  /** @type {Array<{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean, ultimaSesion: number }>} */
+  /** @type {Array<{ email: string, nombre: string, rol: string, ultimaSesion: number }>} */
   let recientes = $state([]);
-  /** @type {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean } | null} */
+  /** @type {{ email: string, nombre: string, rol: string } | null} */
   let usuarioSeleccionado = $state(null);
   let modoManual = $state(false);
 
@@ -61,18 +60,12 @@
     if (haySesion()) goto('/');
   });
 
-  /** @param {{ email: string, nombre: string, rol: string, password?: string, recordarPassword?: boolean }} u */
+  /** @param {{ email: string, nombre: string, rol: string }} u */
   async function seleccionarUsuario(u) {
     usuarioSeleccionado = u;
     email = u.email;
     error = '';
-    if (u.recordarPassword && u.password) {
-      password = u.password;
-      recordarPassword = true;
-    } else {
-      password = '';
-      recordarPassword = Boolean(u.recordarPassword);
-    }
+    password = '';
     await tick();
     if (inputPassword && !password) {
       inputPassword.focus();
@@ -84,7 +77,6 @@
     modoManual = true;
     email = '';
     password = '';
-    recordarPassword = true;
     error = '';
   }
 
@@ -133,7 +125,7 @@
     error = '';
     entrando = true;
     try {
-      await iniciarSesion(email, password, recordarPassword);
+      await iniciarSesion(email, password);
       await goto('/');
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
@@ -209,11 +201,6 @@
               />
             </div>
 
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={recordarPassword} />
-              <span>Recordar contraseña en este equipo</span>
-            </label>
-
             {#if error}
               <p class="error">{error}</p>
             {/if}
@@ -240,11 +227,6 @@
               <label for="password">Contraseña</label>
               <input id="password" class="input" type="password" bind:value={password} autocomplete="current-password" placeholder="••••••••" required />
             </div>
-
-            <label class="checkbox-label">
-              <input type="checkbox" bind:checked={recordarPassword} />
-              <span>Recordar contraseña en este equipo</span>
-            </label>
 
             {#if error}
               <p class="error">{error}</p>
@@ -404,22 +386,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: 13px;
-    color: var(--color-text-muted, #4a5568);
-    cursor: pointer;
-    user-select: none;
-  }
-  .checkbox-label input[type="checkbox"] {
-    accent-color: var(--color-accent-600, #2e6e73);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
   }
 
   .error {

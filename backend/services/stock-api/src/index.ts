@@ -7,10 +7,14 @@
 import { pool } from './db/pool.js';
 import { env } from './config/env.js';
 import { createApp } from './app.js';
+import { jwtSecret } from './services/tokenService.js';
 
 const app = createApp();
 
 const port = Number(env('PUERTO', '3000'));
+
+// Fallar al arrancar, no en el primer login, si falta el secreto de firma.
+jwtSecret();
 
 try {
   await pool.query('SELECT 1');

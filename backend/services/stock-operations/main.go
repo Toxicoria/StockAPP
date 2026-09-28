@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"stock-operations/db"
@@ -10,6 +11,11 @@ import (
 )
 
 func main() {
+	if err := api.ValidarConfiguracion(); err != nil {
+		logger.Error("Configuración inválida: %v", err)
+		os.Exit(1)
+	}
+
 	// 1. Conectarse a la base de datos antes de levantar el servidor.
 	//    Si la DB no responde, el programa termina aquí con un error claro.
 	db.Iniciar()

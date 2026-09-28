@@ -27,11 +27,17 @@ spec:
             - name: DB_USER
               value: admin_dev
             - name: DB_PASSWORD
-              value: password_dev
+              valueFrom:
+                secretKeyRef:
+                  name: stockapp-secrets
+                  key: DB_PASSWORD
             - name: DB_NAME
               value: stock_db
             - name: JWT_SECRET
-              value: secreto_solo_para_desarrollo
+              valueFrom:
+                secretKeyRef:
+                  name: stockapp-secrets
+                  key: JWT_SECRET
             - name: GO_INTERNO
               value: http://stock-operations:8080
           readinessProbe:

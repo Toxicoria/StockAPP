@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import type { Pool, PoolClient } from 'pg';
 import { pool } from '../db/pool.js';
 import { ApiError } from '../errors/ApiError.js';
 import { hashToken, newRefreshToken, signAccessToken } from './tokenService.js';
@@ -12,11 +13,13 @@ interface UserRow {
   rol: string;
 }
 
-async function issueTokens(user: Omit<UserRow, 'password_hash'>, device: string) {
+type QueryExecutor = Pick<Pool | PoolClient, 'query'>;
+
+async function issueTokens(db: QueryExecutor, user: Omit<UserRow, 'password_hash'>, device: string) {
   const access_token = signAccessToken(user);
   const { token: refresh_token, expiresAt } = newRefreshToken();
 
-  await pool.query(
+  await db.query(
     `INSERT INTO refresh_tokens (id_usuario, token_hash, dispositivo, expira_en)
      VALUES ($1, $2, $3, $4)`,
     [user.id_usuario, hashToken(refresh_token), device, expiresAt],
@@ -46,29 +49,47 @@ export async function login(email: string, password: string, device: string) {
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     throw new ApiError(401, 'invalid credentials');
   }
-  return issueTokens(user, device);
+  return issueTokens(pool, user, device);
 }
 
 export async function refresh(refreshToken: string) {
-  const { rows } = await pool.query(
-    `SELECT rt.id, rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio,
-            n.nombre_negocio, u.nombre, u.rol
-       FROM refresh_tokens rt
-       JOIN usuarios u ON u.id_usuario = rt.id_usuario
-       JOIN negocios n ON n.id_negocio = u.id_negocio
-      WHERE rt.token_hash = $1`,
-    [hashToken(refreshToken)],
-  );
-  const row = rows[0];
-  if (!row) throw new ApiError(401, 'unknown refresh token');
+  const client = await pool.connect();
+  let transactionOpen = false;
+  try {
+    await client.query('BEGIN');
+    transactionOpen = true;
 
-  // Rotation: the presented token is always deleted, even if expired.
-  await pool.query(`DELETE FROM refresh_tokens WHERE id = $1`, [row.id]);
+    // DELETE ... RETURNING consume el token en un único paso. Dos refresh
+    // concurrentes no pueden obtener dos pares nuevos a partir del mismo token.
+    const { rows } = await client.query(
+      `DELETE FROM refresh_tokens rt
+       USING usuarios u, negocios n
+       WHERE rt.token_hash = $1
+         AND u.id_usuario = rt.id_usuario
+         AND n.id_negocio = u.id_negocio
+       RETURNING rt.dispositivo, rt.expira_en, u.id_usuario, u.id_negocio,
+                 n.nombre_negocio, u.nombre, u.rol`,
+      [hashToken(refreshToken)],
+    );
+    const row = rows[0];
+    if (!row) throw new ApiError(401, 'unknown refresh token');
 
-  if (new Date(row.expira_en).getTime() < Date.now()) {
-    throw new ApiError(401, 'session expired, please log in again');
+    if (new Date(row.expira_en).getTime() < Date.now()) {
+      await client.query('COMMIT');
+      transactionOpen = false;
+      throw new ApiError(401, 'session expired, please log in again');
+    }
+
+    const tokens = await issueTokens(client, row, row.dispositivo ?? '');
+    await client.query('COMMIT');
+    transactionOpen = false;
+    return tokens;
+  } catch (error) {
+    if (transactionOpen) await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-  return issueTokens(row, row.dispositivo ?? '');
 }
 
 export async function logout(refreshToken: string) {

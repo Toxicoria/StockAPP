@@ -39,6 +39,7 @@ bin/
 .env
 .env.*
 !app-desktop/.env.development
+!backend/infra/.env.example
 process-compose.yaml
 cliente-sidecar/tsnet-state/
 **/tsnet-state/

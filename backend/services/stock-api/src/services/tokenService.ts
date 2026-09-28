@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
+import { requiredEnv } from '../config/env.js';
 
 const ACCESS_TOKEN_TTL_SEC = 15 * 60;
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days, matches esquema.sql
@@ -16,7 +16,9 @@ interface TokenClaims {
 // stock-operations now validates sessions through /internal/session instead
 // of verifying the signature itself.
 export function jwtSecret(): string {
-  return env('JWT_SECRET', 'secreto_solo_para_desarrollo');
+  const secret = requiredEnv('JWT_SECRET');
+  if (secret.length < 32) throw new Error('JWT_SECRET must contain at least 32 characters');
+  return secret;
 }
 
 export function hashToken(token: string): string {

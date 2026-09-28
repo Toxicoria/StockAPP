@@ -21,12 +21,17 @@ const (
 )
 
 func main() {
+	password := os.Getenv("DB_PASSWORD")
+	if password == "" {
+		fmt.Printf("%s[ERROR]%s Falta la variable de entorno DB_PASSWORD\n", dbRed, dbReset)
+		os.Exit(1)
+	}
 
-	// Mismas variables de entorno que db.go, con los mismos defaults de desarrollo
+	// Mismas variables de entorno que db.go; la contraseña no tiene default.
 	connStr := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		valorEnv("DB_USER", "admin_dev"),
-		valorEnv("DB_PASSWORD", "password_dev"),
+		password,
 		valorEnv("DB_HOST", "localhost"),
 		valorEnv("DB_PORT", "5432"),
 		valorEnv("DB_NAME", "stock_db"),
